@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线命令行 - AI网络工程系统</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/vendor/font-awesome/all.min.css" rel="stylesheet">
+    <link href="/static/vendor/highlight.js/github.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link href="/static/css/command_line.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3 me-2"></i>
+                AI网络工程系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/chat">AI聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/topology">网络拓扑</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/develop">开发页面</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/command_line">在线命令行</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/custom_tools">自定义工具</a>
+                    </li>
+                </ul>
+                
+                <!-- 用户信息 -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown" id="userSection" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="/api/settings"><i class="fas fa-cog me-2"></i>用户设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-item" id="authSection">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid h-100">
+        <div class="row h-100">
+            <!-- 侧边栏 -->
+            <div class="col-md-3 sidebar">
+                <div class="sidebar-header">
+                    <h5><i class="bi bi-terminal me-2"></i>在线命令行</h5>
+                </div>
+                
+                <!-- 设备选择 -->
+                <div class="device-selection mb-3">
+                    <h6><i class="bi bi-server me-2"></i>选择设备</h6>
+                    <select id="deviceSelect" class="form-select">
+                        <option value="local">本地终端</option>
+                        <!-- 动态加载设备列表 -->
+                    </select>
+                </div>
+                
+                <!-- 命令历史 -->
+                <div class="command-history">
+                    <h6>
+                        <i class="bi bi-clock-history me-2"></i>命令历史
+                        <button class="btn btn-sm btn-outline-secondary float-end" id="clearHistoryBtn" onclick="window.commandLineManager.clearHistory()">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </h6>
+                    <div id="historyList" class="history-list">
+                        <!-- 动态加载命令历史 -->
+                    </div>
+                </div>
+                
+                <!-- 收藏命令 -->
+                <div class="favorite-commands mt-3">
+                    <h6><i class="bi bi-star me-2"></i>收藏命令</h6>
+                    <div id="favoritesList" class="favorites-list">
+                        <!-- 动态加载收藏命令 -->
+                    </div>
+                </div>
+                
+                <!-- 常用命令 -->
+                <div class="common-commands mt-3">
+                    <h6><i class="bi bi-star me-2"></i>常用命令</h6>
+                    <div class="common-commands-list">
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="window.commandLineManager.insertCommand('ping')">
+                            <i class="bi bi-arrow-right me-1"></i>ping
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="window.commandLineManager.insertCommand('traceroute')">
+                            <i class="bi bi-arrow-right me-1"></i>traceroute
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="window.commandLineManager.insertCommand('ifconfig')">
+                            <i class="bi bi-arrow-right me-1"></i>ifconfig/ipconfig
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="window.commandLineManager.insertCommand('nslookup')">
+                            <i class="bi bi-arrow-right me-1"></i>nslookup
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary w-100 mb-2" onclick="window.commandLineManager.insertCommand('netstat')">
+                            <i class="bi bi-arrow-right me-1"></i>netstat
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 会话管理 -->
+                <div class="session-management mt-3">
+                    <h6><i class="bi bi-hdd-stack me-2"></i>会话管理</h6>
+                    <div id="sessionsList" class="sessions-list mb-2">
+                        <!-- 动态加载会话列表 -->
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-success" id="connectBtn">
+                            <i class="bi bi-plus-circle me-1"></i>连接设备
+                        </button>
+                        <button class="btn btn-sm btn-success" id="createSessionBtn">
+                            <i class="bi bi-plus-circle me-1"></i>创建新会话
+                        </button>
+                        <button class="btn btn-sm btn-danger" id="disconnectBtn">
+                            <i class="bi bi-x-circle me-1"></i>终止当前会话
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 主要内容区域 -->
+            <div class="col-md-9 main-content">
+                <div class="terminal-area">
+                    <!-- 工具栏 -->
+                    <div class="toolbar">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="toolbar-left">
+                                <span class="badge bg-success" id="connectionStatus">已连接</span>
+                                <span class="ms-2" id="deviceInfo">本地终端</span>
+                            </div>
+                            <div class="toolbar-right">
+                                <button class="btn btn-sm btn-outline-secondary" id="clearBtn" onclick="window.commandLineManager.clearTerminal()">
+                                    <i class="bi bi-trash me-1"></i>清空终端
+                                </button>
+                                <div class="btn-group ms-2">
+                                    <button class="btn btn-sm btn-outline-primary" id="copyOutputBtn" onclick="window.commandLineManager.copyOutput()">
+                                        <i class="bi bi-clipboard me-1"></i>复制输出
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-primary" id="downloadOutputBtn" onclick="window.commandLineManager.downloadOutput()">
+                                        <i class="bi bi-download me-1"></i>下载输出
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 终端输出区域 -->
+                    <div class="terminal-output" id="terminalOutput">
+                        <div class="welcome-message">
+                            <div class="terminal-line">
+                                <span class="text-success">欢迎使用AI网络工程系统在线命令行</span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="text-muted">当前时间: <span id="currentTime"></span></span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="text-muted">输入 'help' 获取帮助信息</span>
+                            </div>
+                            <div class="terminal-line">
+                                <span class="text-muted">------------------------------------</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 命令输入区域 -->
+                    <div class="command-input-area">
+                        <div class="input-group">
+                            <span class="input-group-text" id="promptLabel">$</span>
+                            <input type="text" class="form-control" id="commandInput" placeholder="输入命令..." autocomplete="off">
+                            <button class="btn btn-primary" type="button" id="sendCommandBtn" onclick="window.commandLineManager.executeCommand()">
+                                <i class="bi bi-arrow-return-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设备连接模态框 -->
+    <div class="modal fade" id="deviceConnectModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-hdd-network me-2"></i>
+                        连接到设备
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="connectDeviceForm">
+                        <div class="mb-3">
+                            <label for="deviceIp" class="form-label">设备IP地址</label>
+                            <input type="text" class="form-control" id="deviceIp" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="deviceUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="deviceUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="devicePassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="devicePassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="deviceType" class="form-label">设备类型</label>
+                            <select class="form-select" id="deviceType">
+                                <option value="cisco">Cisco</option>
+                                <option value="huawei">华为</option>
+                                <option value="h3c">H3C</option>
+                                <option value="dcn">DCN</option>
+                                <option value="linux">Linux</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="connectBtn">连接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 保存命令模态框 -->
+    <div class="modal fade" id="saveCommandModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-bookmark-plus me-2"></i>
+                        保存命令
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="saveCommandForm">
+                        <div class="mb-3">
+                            <label for="commandName" class="form-label">命令名称</label>
+                            <input type="text" class="form-control" id="commandName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="commandText" class="form-label">命令内容</label>
+                            <input type="text" class="form-control" id="commandText" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="commandDescription" class="form-label">描述</label>
+                            <textarea class="form-control" id="commandDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="commandCategory" class="form-label">分类</label>
+                            <select class="form-select" id="commandCategory">
+                                <option value="network">网络</option>
+                                <option value="system">系统</option>
+                                <option value="security">安全</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveCommandBtn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建会话模态框 -->
+    <div class="modal fade" id="createSessionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        创建新会话
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createSessionForm">
+                        <div class="mb-3">
+                            <label for="sessionName" class="form-label">会话名称</label>
+                            <input type="text" class="form-control" id="sessionName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sessionDevice" class="form-label">设备</label>
+                            <select class="form-select" id="sessionDevice" required>
+                                <!-- 动态加载设备列表 -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sessionUsername" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="sessionUsername" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sessionPassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="sessionPassword" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sessionType" class="form-label">设备类型</label>
+                            <select class="form-select" id="sessionType">
+                                <option value="cisco">Cisco</option>
+                                <option value="huawei">华为</option>
+                                <option value="h3c">H3C</option>
+                                <option value="dcn">DCN</option>
+                                <option value="linux">Linux</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" form="createSessionForm" class="btn btn-primary">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 库 -->
+    <script src="/static/js/jquery-3.6.0.min.js"></script>
+    <script src="/static/vendor/bootstrap/bootstrap-5.3.0.bundle.min.js"></script>
+    <script src="/static/vendor/highlight.js/highlight-11.7.0.min.js"></script>
+    <script src="/static/vendor/highlight.js/bash.min.js"></script>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/api_client.js"></script>
+    <script src="/static/js/command_line.js"></script>
+</body>
+</html>

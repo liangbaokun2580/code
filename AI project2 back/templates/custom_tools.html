@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义工具 - AI网络管理系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/font-awesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/codemirror/lib/codemirror.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/codemirror/theme/dracula.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom_tools.css') }}">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">AI网络管理系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/"><i class="fas fa-home"></i> 首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/chat"><i class="fas fa-comments"></i> AI助手</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/topology"><i class="fas fa-project-diagram"></i> 网络拓扑</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/command_line"><i class="fas fa-terminal"></i> 命令行</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/custom_tools"><i class="fas fa-tools"></i> 自定义工具</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/develop"><i class="fas fa-code"></i> 开发环境</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-user-circle"></i> {{ current_user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-cog"></i> 设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/auth/logout"><i class="fas fa-sign-out-alt"></i> 退出登录</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div class="container-fluid mt-3">
+        <div class="row">
+            <!-- 左侧工具列表 -->
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">工具列表</h5>
+                        <button id="createToolBtn" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> 新建工具</button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush" id="toolsList">
+                            <!-- 工具列表将通过JavaScript动态加载 -->
+                            <div class="list-group-item text-center text-muted">
+                                <i class="fas fa-spinner fa-spin me-2"></i>加载中...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h5 class="mb-0">工具分类</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            <a href="#" class="list-group-item list-group-item-action active" data-category="all">全部工具</a>
+                            <a href="#" class="list-group-item list-group-item-action" data-category="network">网络工具</a>
+                            <a href="#" class="list-group-item list-group-item-action" data-category="system">系统工具</a>
+                            <a href="#" class="list-group-item list-group-item-action" data-category="security">安全工具</a>
+                            <a href="#" class="list-group-item list-group-item-action" data-category="other">其他工具</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧工具详情/编辑区 -->
+            <div class="col-md-9">
+                <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="toolTabs">
+                            <li class="nav-item">
+                                <a class="nav-link active" id="editor-tab" data-bs-toggle="tab" href="#editor">编辑器</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="run-tab" data-bs-toggle="tab" href="#run">运行</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" id="docs-tab" data-bs-toggle="tab" href="#docs">文档</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body">
+                        <div class="tab-content">
+                            <!-- 编辑器标签页 -->
+                            <div class="tab-pane fade show active" id="editor">
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5 id="currentToolName">未选择工具</h5>
+                                        <div class="btn-group">
+                                            <button id="saveToolBtn" class="btn btn-success" disabled><i class="fas fa-save"></i> 保存</button>
+                                            <button id="deleteToolBtn" class="btn btn-danger" disabled><i class="fas fa-trash"></i> 删除</button>
+                                        </div>
+                                    </div>
+                                    <div class="tool-metadata mb-3" id="toolMetadata">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label for="toolName" class="form-label">工具名称</label>
+                                                <input type="text" class="form-control" id="toolName" placeholder="输入工具名称">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="toolCategory" class="form-label">分类</label>
+                                                <select class="form-select" id="toolCategory">
+                                                    <option value="network">网络工具</option>
+                                                    <option value="system">系统工具</option>
+                                                    <option value="security">安全工具</option>
+                                                    <option value="other">其他工具</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="toolVersion" class="form-label">版本</label>
+                                                <input type="text" class="form-control" id="toolVersion" placeholder="1.0">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="toolAuthor" class="form-label">作者</label>
+                                                <input type="text" class="form-control" id="toolAuthor" placeholder="输入作者名称">
+                                            </div>
+                                            <div class="col-12">
+                                                <label for="toolDescription" class="form-label">描述</label>
+                                                <textarea class="form-control" id="toolDescription" rows="2" placeholder="描述这个工具的功能和用途"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="codeEditor" class="code-editor"></div>
+                                </div>
+                            </div>
+
+                            <!-- 运行标签页 -->
+                            <div class="tab-pane fade" id="run">
+                                <div class="mb-3">
+                                    <h5>参数设置</h5>
+                                    <div id="parametersForm" class="mb-3">
+                                        <!-- 参数表单将根据工具定义动态生成 -->
+                                        <div class="alert alert-info">
+                                            请先选择一个工具，或切换到编辑器标签页定义参数。
+                                        </div>
+                                    </div>
+                                    <button id="runToolBtn" class="btn btn-primary" disabled><i class="fas fa-play"></i> 运行工具</button>
+                                </div>
+                                <div class="mb-3">
+                                    <h5>运行结果</h5>
+                                    <div class="card">
+                                        <div class="card-header bg-dark text-white">
+                                            <i class="fas fa-terminal"></i> 输出
+                                            <button id="clearOutputBtn" class="btn btn-sm btn-outline-light float-end"><i class="fas fa-eraser"></i> 清空</button>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <pre id="toolOutput" class="tool-output">准备就绪，等待运行工具...</pre>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 文档标签页 -->
+                            <div class="tab-pane fade" id="docs">
+                                <div class="mb-3">
+                                    <h4>自定义工具开发指南</h4>
+                                    <p>您可以使用Python创建自定义工具，以扩展系统功能。每个工具都是一个独立的Python模块，需要遵循以下结构：</p>
+                                    
+                                    <h5>1. 工具元数据</h5>
+                                    <p>在模块顶部定义以下变量：</p>
+                                    <pre class="bg-light p-3 rounded">
+# 工具名称
+TOOL_NAME = "示例工具"
+
+# 工具描述
+TOOL_DESCRIPTION = "这是一个示例工具，用于演示自定义工具的创建方法。"
+
+# 工具作者
+TOOL_AUTHOR = "您的名字"
+
+# 工具版本
+TOOL_VERSION = "1.0"
+
+# 工具参数定义
+TOOL_PARAMETERS = [
+    {
+        "name": "param1",
+        "type": "string",
+        "label": "参数1",
+        "description": "这是第一个参数",
+        "required": True,
+        "default": ""
+    },
+    {
+        "name": "param2",
+        "type": "number",
+        "label": "参数2",
+        "description": "这是第二个参数",
+        "required": False,
+        "default": 42
+    }
+]
+</pre>
+
+                                    <h5>2. 工具主函数</h5>
+                                    <p>每个工具必须定义一个名为<code>run</code>的函数，该函数接收参数并返回结果：</p>
+                                    <pre class="bg-light p-3 rounded">
+def run(params):
+    """工具的主函数，接收参数并返回结果"""
+    # 获取参数
+    param1 = params.get("param1", "")
+    param2 = params.get("param2", 42)
+    
+    # 执行工具逻辑
+    result = f"处理参数: {param1}, {param2}"
+    
+    # 返回结果（可以是任何可JSON序列化的对象）
+    return {
+        "message": "工具执行成功",
+        "data": result
+    }
+</pre>
+
+                                    <h5>3. 可用的内置模块</h5>
+                                    <p>您可以在工具中导入和使用以下模块：</p>
+                                    <ul>
+                                        <li>标准Python库（如os, sys, json, re等）</li>
+                                        <li>网络工具（如requests, paramiko等）</li>
+                                        <li>数据处理（如pandas, numpy等）</li>
+                                    </ul>
+                                    
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> <strong>安全提示：</strong> 请注意，自定义工具在服务器上执行，请确保您的代码安全可靠，不包含恶意操作。
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新建工具模态框 -->
+    <div class="modal fade" id="createToolModal" tabindex="-1" aria-labelledby="createToolModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createToolModalLabel">新建工具</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="createToolForm">
+                        <div class="mb-3">
+                            <label for="newToolName" class="form-label">工具名称</label>
+                            <input type="text" class="form-control" id="newToolName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newToolDescription" class="form-label">描述</label>
+                            <textarea class="form-control" id="newToolDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="newToolCategory" class="form-label">分类</label>
+                            <select class="form-select" id="newToolCategory">
+                                <option value="network">网络工具</option>
+                                <option value="system">系统工具</option>
+                                <option value="security">安全工具</option>
+                                <option value="other">其他工具</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">模板</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="templateType" id="templateEmpty" value="empty" checked>
+                                <label class="form-check-label" for="templateEmpty">
+                                    空白模板
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="templateType" id="templateBasic" value="basic">
+                                <label class="form-check-label" for="templateBasic">
+                                    基础模板（包含参数示例）
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="templateType" id="templateNetwork" value="network">
+                                <label class="form-check-label" for="templateNetwork">
+                                    网络工具模板
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmCreateTool">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 库 -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/codemirror/lib/codemirror.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/codemirror/mode/python/python.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/codemirror/addon/edit/matchbrackets.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/codemirror/addon/selection/active-line.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/custom_tools.js') }}"></script>
+</body>
+</html>

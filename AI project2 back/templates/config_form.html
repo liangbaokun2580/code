@@ -1,0 +1,183 @@
+<!-- 系统配置表单片段 -->
+<form id="configForm" method="POST" action="{{ url_for('settings.config_page') }}">
+    {{ form.hidden_tag() }}
+    
+    <!-- AI配置 -->
+    <div class="config-section">
+        <h2><i class="fas fa-robot"></i> AI模型配置</h2>
+        <div class="config-grid">
+            
+            <!-- OpenAI配置 -->
+            <div id="openaiConfig" class="model-config">
+                <div class="form-group">
+                    <label for="openai_api_key">OpenAI API Key</label>
+                    {{ form.openai_api_key(class="form-control", placeholder="sk-...") }}
+                    <small class="form-text">您的OpenAI API密钥</small>
+                </div>
+                
+                <div class="form-group">
+                <label for="openai_api_base">OpenAI API Base URL</label>
+                {{ form.openai_api_base(class="form-control", placeholder="https://api.openai.com") }}
+                <small class="form-text">OpenAI API基础URL</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="openai_model">模型</label>
+                {{ form.openai_model(class="form-control", placeholder="gpt-3.5-turbo") }}
+                <small class="form-text">选择要使用的OpenAI模型</small>
+            </div>
+                
+                <div class="form-group">
+                    <label for="openai_temperature">温度</label>
+                    {{ form.openai_temperature(class="form-control", step="0.1", min="0", max="2") }}
+                    <small class="form-text">控制回答的随机性 (0.0-2.0)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="openai_top_p">核采样</label>
+                    {{ form.openai_top_p(class="form-control", step="0.1", min="0", max="1") }}
+                    <small class="form-text">与随机性相似，但不会更改已确定的选择 (0.0-1.0)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="openai_presence_penalty">话题新鲜度</label>
+                    {{ form.openai_presence_penalty(class="form-control", step="0.1", min="-2", max="2") }}
+                    <small class="form-text">越大，越有可能产生新话题 (-2.0-2.0)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="openai_frequency_penalty">频率惩罚度</label>
+                    {{ form.openai_frequency_penalty(class="form-control", step="0.1", min="-2", max="2") }}
+                    <small class="form-text">越大，越有可能减少重复单词 (-2.0-2.0)</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="openai_max_tokens">最大令牌数</label>
+                    {{ form.openai_max_tokens(class="form-control", min="1", max="4096") }}
+                    <small class="form-text">单次回答的最大长度</small>
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-connection">
+            <button type="button" id="testAIConnection" class="btn btn-outline-primary">
+                <i class="fas fa-plug"></i> 测试AI连接
+            </button>
+            <div id="connectionStatus" class="connection-status"></div>
+        </div>
+    </div>
+    
+    <!-- 数据库配置 -->
+    <div class="config-section">
+        <h2><i class="fas fa-database"></i> 数据库配置</h2>
+        <div class="config-grid">
+            <div class="form-group">
+                <label for="database_uri">数据库URL</label>
+                {{ form.database_uri(class="form-control", placeholder="sqlite:///app.db") }}
+                <small class="form-text">数据库连接字符串</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="database_pool_size">连接池大小</label>
+                {{ form.database_pool_size(class="form-control", min="1", max="100") }}
+                <small class="form-text">数据库连接池大小</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 网络扫描配置 -->
+    <div class="config-section">
+        <h2><i class="fas fa-network-wired"></i> 网络扫描配置</h2>
+        <div class="config-grid">
+            <div class="form-group">
+                <label for="network_scan_timeout">扫描超时</label>
+                {{ form.network_scan_timeout(class="form-control", min="1", max="300") }}
+                <small class="form-text">网络扫描超时时间（秒）</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="network_scan_threads">扫描线程数</label>
+                {{ form.network_scan_threads(class="form-control", min="1", max="100") }}
+                <small class="form-text">并发扫描线程数</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="default_scan_range">默认扫描范围</label>
+                {{ form.default_scan_range(class="form-control", placeholder="192.168.1.0/24") }}
+                <small class="form-text">默认的网络扫描范围</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Redis配置 -->
+    <div class="config-section">
+        <h2><i class="fas fa-memory"></i> Redis配置</h2>
+        <div class="config-grid">
+            <div class="form-group">
+                <label for="redis_host">Redis主机</label>
+                {{ form.redis_host(class="form-control", placeholder="localhost") }}
+                <small class="form-text">Redis服务器地址</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="redis_port">Redis端口</label>
+                {{ form.redis_port(class="form-control", min="1", max="65535") }}
+                <small class="form-text">Redis服务器端口</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="redis_url">Redis连接URL</label>
+                {{ form.redis_url(class="form-control", placeholder="redis://localhost:6379/0") }}
+                <small class="form-text">Redis完整连接URL</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="redis_password">Redis密码</label>
+                {{ form.redis_password(class="form-control", type="password") }}
+                <small class="form-text">Redis认证密码（可选）</small>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 应用配置 -->
+    <div class="config-section">
+        <h2><i class="fas fa-cogs"></i> 应用配置</h2>
+        <div class="config-grid">
+            <div class="form-group">
+                <label for="app_name">应用名称</label>
+                {{ form.app_name(class="form-control", placeholder="AI网络管理系统") }}
+                <small class="form-text">应用显示名称</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="app_version">应用版本</label>
+                {{ form.app_version(class="form-control", placeholder="1.0.0") }}
+                <small class="form-text">当前应用版本</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="debug_mode">调试模式</label>
+                <div class="form-check form-switch">
+                    {{ form.debug_mode(class="form-check-input") }}
+                    <label class="form-check-label" for="debug_mode">启用调试模式</label>
+                </div>
+                <small class="form-text">启用详细的错误信息</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="log_level">日志级别</label>
+                {{ form.log_level(class="form-select") }}
+                <small class="form-text">系统日志记录级别</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-save"></i> 保存配置
+        </button>
+        <button type="button" class="btn btn-secondary" onclick="location.reload()">
+            <i class="fas fa-undo"></i> 重置
+        </button>
+    </div>
+</form>

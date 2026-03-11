@@ -1,0 +1,98 @@
+# Flask Web Framework
+Flask==2.3.3
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.0.5
+Flask-Migrate==4.0.5
+Flask-WTF==1.1.1
+Flask-CORS==4.0.0
+Flask-Limiter==3.5.0
+Flask-SocketIO==5.3.6
+
+# Database
+SQLAlchemy==2.0.21
+psycopg2-binary==2.9.7  # PostgreSQL adapter
+PyMySQL==1.1.0  # MySQL adapter
+
+# AI and OpenAI
+openai==1.93.0
+aiohttp==3.8.5
+ollama==0.2.1
+
+# Network and Security
+requests==2.31.0
+cryptography==41.0.4
+bcrypt==4.0.1
+PyJWT==2.8.0
+paramiko>=2.12.0
+
+# Data Processing
+numpy==1.24.3
+pandas==2.0.3
+json5==0.9.14
+
+# Configuration and Environment
+python-dotenv==1.0.0
+click==8.1.7
+
+# Caching and Session
+redis==4.6.0
+Flask-Session==0.5.0
+
+# Code Formatting (optional)
+autopep8==2.0.4
+
+# Logging and Monitoring
+loguru==0.7.2
+
+# Utilities
+markdown==3.4.4
+bleach==6.0.0
+validators==0.22.0
+
+# Development Tools (optional)
+pytest==7.4.2
+pytest-flask==1.2.0
+flake8==6.0.0
+black==23.7.0
+
+# WSGI Server for Production
+gunicorn==21.2.0
+
+# File Upload and Processing
+Werkzeug==2.3.7
+
+# Date and Time
+python-dateutil==2.8.2
+
+# Threading and Async (using built-in threading module)
+# Note: threading is built-in, no external package needed
+
+# Network Tools
+ipaddress==1.0.23
+netifaces==0.11.0
+
+# System Information
+psutil==5.9.5
+
+# Email (if needed)
+Flask-Mail==0.9.1
+
+# Form Validation
+WTForms==3.0.1
+
+# HTML/XML Processing
+BeautifulSoup4==4.12.2
+lxml==4.9.3
+
+# HTTP Client
+httpx==0.27.2
+
+# Task Queue (optional)
+celery==5.3.1
+
+# Monitoring and Health Checks
+flask-healthz==0.0.3
+
+# API Documentation (optional)
+flask-restx==1.1.0
+flasgger==0.9.7.1

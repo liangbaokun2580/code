@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSSH终端 - 网络拓扑管理系统</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Xterm.js 样式 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.min.css">
+    <style>
+        .terminal-container {
+            width: 100%;
+            height: 500px;
+            background-color: #000;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        
+        #terminal {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .device-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .device-item {
+            cursor: pointer;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            transition: background-color 0.2s;
+        }
+        
+        .device-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .device-item.active {
+            background-color: #e9ecef;
+        }
+        
+        .session-badge {
+            font-size: 0.8em;
+        }
+        
+        .connection-form {
+            margin-top: 20px;
+        }
+        
+        .terminal-toolbar {
+            background-color: #343a40;
+            color: white;
+            padding: 5px 10px;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .terminal-toolbar .title {
+            font-weight: bold;
+        }
+        
+        .terminal-toolbar .actions button {
+            background: none;
+            border: none;
+            color: white;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .terminal-toolbar .actions button:hover {
+            color: #17a2b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 侧边栏 -->
+            <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">
+                                <i class="fas fa-home"></i> 首页
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/chat">
+                                <i class="fas fa-comments"></i> AI助手
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/topology">
+                                <i class="fas fa-project-diagram"></i> 网络拓扑
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link active" href="/webssh">
+                                <i class="fas fa-terminal"></i> SSH终端
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/command_line">
+                                <i class="fas fa-code"></i> 命令行
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/develop">
+                                <i class="fas fa-code-branch"></i> 开发工具
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/custom_tools">
+                                <i class="fas fa-tools"></i> 自定义工具
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 主内容区 -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2"><i class="fas fa-terminal"></i> WebSSH终端</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0">
+                        <div class="btn-group me-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="refreshDevicesBtn">
+                                <i class="fas fa-sync-alt"></i> 刷新设备
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="disconnectAllBtn">
+                                <i class="fas fa-power-off"></i> 断开所有
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- 设备列表 -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <ul class="nav nav-tabs card-header-tabs" id="deviceTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="devices-tab" data-bs-toggle="tab" data-bs-target="#devices" type="button" role="tab" aria-controls="devices" aria-selected="true">
+                                            <i class="fas fa-server"></i> 设备
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="sessions-tab" data-bs-toggle="tab" data-bs-target="#sessions" type="button" role="tab" aria-controls="sessions" aria-selected="false">
+                                            <i class="fas fa-plug"></i> 会话 <span class="badge bg-primary session-count">0</span>
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-body">
+                                <div class="tab-content" id="deviceTabsContent">
+                                    <!-- 设备列表标签页 -->
+                                    <div class="tab-pane fade show active" id="devices" role="tabpanel" aria-labelledby="devices-tab">
+                                        <div class="input-group mb-3">
+                                            <input type="text" class="form-control" placeholder="搜索设备..." id="deviceSearch">
+                                            <button class="btn btn-outline-secondary" type="button" id="searchBtn">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                        <div class="device-list" id="deviceList">
+                                            <div class="text-center py-3">
+                                                <div class="spinner-border text-primary" role="status">
+                                                    <span class="visually-hidden">加载中...</span>
+                                                </div>
+                                                <p class="mt-2">加载设备列表...</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 会话列表标签页 -->
+                                    <div class="tab-pane fade" id="sessions" role="tabpanel" aria-labelledby="sessions-tab">
+                                        <div class="device-list" id="sessionList">
+                                            <div class="text-center py-3">
+                                                <p>没有活跃的SSH会话</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 连接表单 -->
+                        <div class="card mt-3 connection-form">
+                            <div class="card-header">
+                                <i class="fas fa-plug"></i> SSH连接
+                            </div>
+                            <div class="card-body">
+                                <form id="sshForm">
+                                    <div class="mb-3">
+                                        <label for="hostname" class="form-label">主机名/IP</label>
+                                        <input type="text" class="form-control" id="hostname" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="port" class="form-label">端口</label>
+                                        <input type="number" class="form-control" id="port" value="22" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="username" class="form-label">用户名</label>
+                                        <input type="text" class="form-control" id="username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="password" class="form-label">密码</label>
+                                        <input type="password" class="form-control" id="password" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-plug"></i> 连接
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 终端区域 -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="terminal-toolbar">
+                                <div class="title">
+                                    <i class="fas fa-terminal"></i> <span id="terminalTitle">SSH终端</span>
+                                </div>
+                                <div class="actions">
+                                    <button id="clearTerminalBtn" title="清空终端">
+                                        <i class="fas fa-eraser"></i>
+                                    </button>
+                                    <button id="disconnectBtn" title="断开连接">
+                                        <i class="fas fa-power-off"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="terminal-container">
+                                <div id="terminal"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <i class="fas fa-info-circle"></i> 连接信息
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>状态:</strong> <span id="connectionStatus">未连接</span></p>
+                                        <p><strong>主机:</strong> <span id="connectionHost">-</span></p>
+                                        <p><strong>用户:</strong> <span id="connectionUser">-</span></p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>会话ID:</strong> <span id="sessionId">-</span></p>
+                                        <p><strong>连接时间:</strong> <span id="connectionTime">-</span></p>
+                                        <p><strong>延迟:</strong> <span id="connectionLatency">-</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- JavaScript 库 -->
+    <script src="/static/js/jquery-3.6.0.min.js"></script>
+    <script src="/static/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/fontawesome.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.8.0/lib/xterm-addon-web-links.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.6.1/dist/socket.io.min.js"></script>
+    
+    <script>
+        // 全局变量
+        let terminal;
+        let socket;
+        let currentSession = null;
+        let activeSessions = {};
+        let deviceList = [];
+        
+        // 初始化终端
+        function initTerminal() {
+            // 创建终端实例
+            terminal = new Terminal({
+                cursorBlink: true,
+                theme: {
+                    background: '#000',
+                    foreground: '#fff',
+                    cursor: '#f0f0f0',
+                    selection: 'rgba(255, 255, 255, 0.3)',
+                    black: '#000000',
+                    red: '#e06c75',
+                    green: '#98c379',
+                    yellow: '#e5c07b',
+                    blue: '#61afef',
+                    magenta: '#c678dd',
+                    cyan: '#56b6c2',
+                    white: '#d0d0d0',
+                    brightBlack: '#808080',
+                    brightRed: '#ff5370',
+                    brightGreen: '#c3e88d',
+                    brightYellow: '#ffcb6b',
+                    brightBlue: '#82aaff',
+                    brightMagenta: '#c792ea',
+                    brightCyan: '#89ddff',
+                    brightWhite: '#ffffff'
+                },
+                fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
+                fontSize: 14,
+                lineHeight: 1.2,
+                scrollback: 1000,
+                tabStopWidth: 8
+            });
+            
+            // 添加插件
+            const fitAddon = new FitAddon.FitAddon();
+            const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+            terminal.loadAddon(fitAddon);
+            terminal.loadAddon(webLinksAddon);
+            
+            // 打开终端
+            terminal.open(document.getElementById('terminal'));
+            fitAddon.fit();
+            
+            // 监听窗口大小变化
+            window.addEventListener('resize', () => {
+                fitAddon.fit();
+                if (socket && currentSession) {
+                    socket.emit('resize', {
+                        session_id: currentSession,
+                        cols: terminal.cols,
+                        rows: terminal.rows
+                    });
+                }
+            });
+            
+            // 监听终端输入
+            terminal.onData(data => {
+                if (socket && currentSession) {
+                    socket.emit('ssh_input', {
+                        session_id: currentSession,
+                        data: data
+                    });
+                }
+            });
+            
+            // 显示欢迎信息
+            terminal.writeln('欢迎使用WebSSH终端');
+            terminal.writeln('请从左侧设备列表选择一个设备连接，或手动输入连接信息');
+            terminal.writeln('');
+        }
+        
+        // 初始化WebSocket连接
+        function initSocket() {
+            socket = io('/webssh');
+            
+            // 连接事件
+            socket.on('connect', () => {
+                console.log('WebSocket连接成功');
+                updateConnectionStatus('已连接到服务器');
+            });
+            
+            // 断开连接事件
+            socket.on('disconnect', () => {
+                console.log('WebSocket连接断开');
+                updateConnectionStatus('服务器连接断开');
+                if (currentSession) {
+                    delete activeSessions[currentSession];
+                    currentSession = null;
+                    updateSessionList();
+                }
+            });
+            
+            // 接收SSH数据
+            socket.on('ssh_data', (data) => {
+                if (data.session_id === currentSession) {
+                    terminal.write(data.data);
+                }
+            });
+            
+            // SSH连接成功
+            socket.on('ssh_connected', (data) => {
+                console.log('SSH连接成功:', data);
+                currentSession = data.session_id;
+                activeSessions[data.session_id] = {
+                    id: data.session_id,
+                    host: data.host,
+                    port: data.port,
+                    username: data.username,
+                    connected_at: new Date(),
+                    device_name: data.device_name || data.host
+                };
+                
+                updateConnectionInfo(activeSessions[data.session_id]);
+                updateSessionList();
+                updateTerminalTitle(activeSessions[data.session_id].device_name);
+                terminal.clear();
+            });
+            
+            // SSH连接错误
+            socket.on('ssh_error', (data) => {
+                console.error('SSH连接错误:', data);
+                terminal.writeln('\r\n\x1b[31m连接错误: ' + data.message + '\x1b[0m');
+                updateConnectionStatus('连接失败: ' + data.message);
+            });
+            
+            // SSH连接关闭
+            socket.on('ssh_closed', (data) => {
+                console.log('SSH连接关闭:', data);
+                terminal.writeln('\r\n\x1b[33m连接已关闭\x1b[0m');
+                updateConnectionStatus('连接已关闭');
+                
+                if (data.session_id === currentSession) {
+                    delete activeSessions[data.session_id];
+                    currentSession = null;
+                    resetConnectionInfo();
+                    updateSessionList();
+                }
+            });
+            
+            // 会话列表更新
+            socket.on('sessions_updated', (data) => {
+                console.log('会话列表更新:', data);
+                activeSessions = data.sessions;
+                updateSessionList();
+            });
+        }
+        
+        // 加载设备列表
+        function loadDevices() {
+            fetch('/api/webssh/devices')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        deviceList = data.devices;
+                        renderDeviceList(deviceList);
+                    } else {
+                        showError('加载设备列表失败: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('加载设备列表错误:', error);
+                    showError('加载设备列表错误: ' + error.message);
+                });
+        }
+        
+        // 渲染设备列表
+        function renderDeviceList(devices) {
+            const deviceListEl = document.getElementById('deviceList');
+            
+            if (devices.length === 0) {
+                deviceListEl.innerHTML = '<div class="text-center py-3"><p>没有可用的设备</p></div>';
+                return;
+            }
+            
+            let html = '';
+            devices.forEach(device => {
+                const hasCredentials = device.has_ssh_credentials ? 
+                    '<span class="badge bg-success">已配置SSH</span>' : 
+                    '<span class="badge bg-warning">未配置SSH</span>';
+                    
+                html += `
+                    <div class="device-item" data-id="${device.id}" data-ip="${device.ip_address}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${device.hostname || device.ip_address}</strong>
+                                <div class="text-muted small">${device.ip_address}</div>
+                            </div>
+                            <div>
+                                ${hasCredentials}
+                                <span class="badge ${device.status === 'online' ? 'bg-success' : 'bg-danger'}">
+                                    ${device.status === 'online' ? '在线' : '离线'}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            ${device.device_type || '未知类型'} | ${device.vendor || '未知厂商'} ${device.model || ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            deviceListEl.innerHTML = html;
+            
+            // 添加点击事件
+            document.querySelectorAll('.device-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const deviceId = item.dataset.id;
+                    const device = deviceList.find(d => d.id === deviceId);
+                    if (device) {
+                        selectDevice(device);
+                    }
+                });
+            });
+        }
+        
+        // 选择设备
+        function selectDevice(device) {
+            document.querySelectorAll('.device-item').forEach(item => {
+                item.classList.remove('active');
+                if (item.dataset.id === device.id) {
+                    item.classList.add('active');
+                }
+            });
+            
+            // 填充连接表单
+            document.getElementById('hostname').value = device.ip_address;
+            document.getElementById('port').value = '22';
+            
+            // 如果设备有SSH凭据，自动填充
+            if (device.has_ssh_credentials) {
+                // 获取设备详细信息，包括凭据
+                fetch(`/api/topology/device/${device.id}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.device && data.device.credentials) {
+                            try {
+                                const credentials = JSON.parse(data.device.credentials);
+                                document.getElementById('username').value = credentials.username || '';
+                                document.getElementById('password').value = credentials.password || '';
+                            } catch (e) {
+                                console.error('解析凭据失败:', e);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('获取设备详情错误:', error);
+                    });
+            } else {
+                // 清空凭据字段
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            }
+        }
+        
+        // 更新会话列表
+        function updateSessionList() {
+            const sessionListEl = document.getElementById('sessionList');
+            const sessionCount = Object.keys(activeSessions).length;
+            document.querySelector('.session-count').textContent = sessionCount;
+            
+            if (sessionCount === 0) {
+                sessionListEl.innerHTML = '<div class="text-center py-3"><p>没有活跃的SSH会话</p></div>';
+                return;
+            }
+            
+            let html = '';
+            for (const sessionId in activeSessions) {
+                const session = activeSessions[sessionId];
+                const isActive = sessionId === currentSession;
+                const connectedTime = formatTimeDiff(new Date(), new Date(session.connected_at));
+                
+                html += `
+                    <div class="device-item ${isActive ? 'active' : ''}" data-session-id="${sessionId}">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${session.device_name || session.host}</strong>
+                                <div class="text-muted small">${session.host}:${session.port}</div>
+                            </div>
+                            <div>
+                                <span class="badge bg-success">已连接</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 small text-muted">
+                            用户: ${session.username} | 已连接: ${connectedTime}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            sessionListEl.innerHTML = html;
+            
+            // 添加点击事件
+            document.querySelectorAll('.device-item[data-session-id]').forEach(item => {
+                item.addEventListener('click', () => {
+                    const sessionId = item.dataset.sessionId;
+                    switchSession(sessionId);
+                });
+            });
+        }
+        
+        // 切换会话
+        function switchSession(sessionId) {
+            if (activeSessions[sessionId]) {
+                currentSession = sessionId;
+                updateConnectionInfo(activeSessions[sessionId]);
+                updateTerminalTitle(activeSessions[sessionId].device_name || activeSessions[sessionId].host);
+                updateSessionList();
+                terminal.clear();
+                
+                // 通知服务器切换会话
+                socket.emit('switch_session', { session_id: sessionId });
+            }
+        }
+        
+        // 连接SSH
+        function connectSSH(host, port, username, password, deviceName) {
+            if (!socket) {
+                showError('WebSocket未连接');
+                return;
+            }
+            
+            updateConnectionStatus('正在连接...');
+            terminal.clear();
+            terminal.writeln(`正在连接到 ${host}:${port} 用户名: ${username}...`);
+            
+            socket.emit('connect_ssh', {
+                host: host,
+                port: port,
+                username: username,
+                password: password,
+                device_name: deviceName,
+                term: 'xterm-256color',
+                cols: terminal.cols,
+                rows: terminal.rows
+            });
+        }
+        
+        // 断开SSH连接
+        function disconnectSSH() {
+            if (socket && currentSession) {
+                socket.emit('disconnect_ssh', { session_id: currentSession });
+                terminal.writeln('\r\n\x1b[33m正在断开连接...\x1b[0m');
+            }
+        }
+        
+        // 断开所有SSH连接
+        function disconnectAllSSH() {
+            if (socket) {
+                socket.emit('disconnect_all');
+                terminal.writeln('\r\n\x1b[33m正在断开所有连接...\x1b[0m');
+            }
+        }
+        
+        // 更新连接状态
+        function updateConnectionStatus(status) {
+            document.getElementById('connectionStatus').textContent = status;
+        }
+        
+        // 更新连接信息
+        function updateConnectionInfo(session) {
+            document.getElementById('connectionHost').textContent = `${session.host}:${session.port}`;
+            document.getElementById('connectionUser').textContent = session.username;
+            document.getElementById('sessionId').textContent = session.id.substring(0, 8) + '...';
+            document.getElementById('connectionTime').textContent = formatTimeDiff(new Date(), new Date(session.connected_at));
+            document.getElementById('connectionStatus').textContent = '已连接';
+            document.getElementById('connectionStatus').className = 'text-success';
+        }
+        
+        // 重置连接信息
+        function resetConnectionInfo() {
+            document.getElementById('connectionHost').textContent = '-';
+            document.getElementById('connectionUser').textContent = '-';
+            document.getElementById('sessionId').textContent = '-';
+            document.getElementById('connectionTime').textContent = '-';
+            document.getElementById('connectionLatency').textContent = '-';
+            document.getElementById('connectionStatus').textContent = '未连接';
+            document.getElementById('connectionStatus').className = '';
+            updateTerminalTitle('SSH终端');
+        }
+        
+        // 更新终端标题
+        function updateTerminalTitle(title) {
+            document.getElementById('terminalTitle').textContent = title;
+        }
+        
+        // 显示错误信息
+        function showError(message) {
+            terminal.writeln(`\r\n\x1b[31m错误: ${message}\x1b[0m`);
+        }
+        
+        // 格式化时间差
+        function formatTimeDiff(now, past) {
+            const diff = Math.floor((now - past) / 1000);
+            
+            if (diff < 60) {
+                return `${diff}秒`;
+            } else if (diff < 3600) {
+                return `${Math.floor(diff / 60)}分钟`;
+            } else if (diff < 86400) {
+                return `${Math.floor(diff / 3600)}小时${Math.floor((diff % 3600) / 60)}分钟`;
+            } else {
+                return `${Math.floor(diff / 86400)}天${Math.floor((diff % 86400) / 3600)}小时`;
+            }
+        }
+        
+        // 搜索设备
+        function searchDevices(query) {
+            if (!query) {
+                renderDeviceList(deviceList);
+                return;
+            }
+            
+            const filteredDevices = deviceList.filter(device => {
+                const searchStr = query.toLowerCase();
+                return (
+                    (device.hostname && device.hostname.toLowerCase().includes(searchStr)) ||
+                    (device.ip_address && device.ip_address.toLowerCase().includes(searchStr)) ||
+                    (device.device_type && device.device_type.toLowerCase().includes(searchStr)) ||
+                    (device.vendor && device.vendor.toLowerCase().includes(searchStr)) ||
+                    (device.model && device.model.toLowerCase().includes(searchStr))
+                );
+            });
+            
+            renderDeviceList(filteredDevices);
+        }
+        
+        // 文档加载完成后初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 初始化终端
+            initTerminal();
+            
+            // 初始化WebSocket
+            initSocket();
+            
+            // 加载设备列表
+            loadDevices();
+            
+            // 表单提交事件
+            document.getElementById('sshForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const host = document.getElementById('hostname').value;
+                const port = parseInt(document.getElementById('port').value, 10);
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                connectSSH(host, port, username, password);
+            });
+            
+            // 刷新设备按钮
+            document.getElementById('refreshDevicesBtn').addEventListener('click', () => {
+                loadDevices();
+            });
+            
+            // 断开连接按钮
+            document.getElementById('disconnectBtn').addEventListener('click', () => {
+                disconnectSSH();
+            });
+            
+            // 断开所有连接按钮
+            document.getElementById('disconnectAllBtn').addEventListener('click', () => {
+                if (confirm('确定要断开所有SSH连接吗？')) {
+                    disconnectAllSSH();
+                }
+            });
+            
+            // 清空终端按钮
+            document.getElementById('clearTerminalBtn').addEventListener('click', () => {
+                terminal.clear();
+            });
+            
+            // 搜索设备
+            document.getElementById('searchBtn').addEventListener('click', () => {
+                const query = document.getElementById('deviceSearch').value;
+                searchDevices(query);
+            });
+            
+            document.getElementById('deviceSearch').addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') {
+                    const query = e.target.value;
+                    searchDevices(query);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

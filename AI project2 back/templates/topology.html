@@ -1,0 +1,3122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络拓扑 - AI网络工程系统</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        .sidebar {
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            height: calc(100vh - 56px);
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .sidebar-header {
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .main-content {
+            height: calc(100vh - 56px);
+            overflow: hidden;
+            padding: 0;
+        }
+        
+        .topology-container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .topology-toolbar {
+            background: #fff;
+            border-bottom: 1px solid #dee2e6;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .topology-canvas {
+            flex: 1;
+            background: #f8f9fa;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #topologyCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        
+        #topologyCanvas:active {
+            cursor: grabbing;
+        }
+        
+        .device-dragging {
+            cursor: move !important;
+        }
+        
+        .device-selected {
+            box-shadow: 0 0 10px rgba(0, 123, 255, 0.5);
+        }
+        
+        .mode-selector .btn {
+            border-radius: 0;
+        }
+        
+        .mode-selector .btn:first-child {
+            border-top-left-radius: 0.375rem;
+            border-bottom-left-radius: 0.375rem;
+        }
+        
+        .mode-selector .btn:last-child {
+            border-top-right-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+        }
+        
+        .scan-progress {
+            display: none;
+        }
+        
+        .device-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .device-item {
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .device-item:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+        }
+        
+        .device-item.selected {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .connectivity-test {
+            margin-top: 20px;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 0.375rem;
+            display: none;
+        }
+        
+        .test-result.success {
+            background: #d1edff;
+            border: 1px solid #0ea5e9;
+            color: #0369a1;
+        }
+        
+        .test-result.error {
+            background: #fee2e2;
+            border: 1px solid #ef4444;
+            color: #dc2626;
+        }
+        
+        .topology-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 0.375rem;
+            border: 1px solid #dee2e6;
+            font-size: 0.875rem;
+        }
+        
+        .manual-device-form {
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 15px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        
+        .status-online {
+            background: #22c55e;
+        }
+        
+        .status-offline {
+            background: #ef4444;
+        }
+        
+        .status-unknown {
+            background: #6b7280;
+        }
+        
+        .import-export-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .topology-text-view {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.875rem;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        /* 右键菜单样式 */
+        .context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            min-width: 150px;
+            display: none;
+        }
+        
+        .context-menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .context-menu-item:hover {
+            background: #f0f0f0;
+        }
+        
+        .context-menu-item:last-child {
+            border-bottom: none;
+        }
+        
+        .context-menu-item.disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+        
+        .context-menu-item.disabled:hover {
+            background: white;
+        }
+        
+        /* 接口选择对话框 */
+        .interface-dialog {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            z-index: 1001;
+            min-width: 300px;
+            display: none;
+        }
+        
+        .interface-dialog-header {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            font-weight: bold;
+        }
+        
+        .interface-dialog-body {
+            padding: 15px;
+        }
+        
+        .interface-dialog-footer {
+            padding: 15px;
+            border-top: 1px solid #eee;
+            text-align: right;
+        }
+        
+        .interface-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .interface-item {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .interface-item:hover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        
+        .interface-item.selected {
+            background: #2196f3;
+            color: white;
+            border-color: #2196f3;
+        }
+        
+        .interface-item.interface-used {
+            background-color: #ffebee;
+            color: #c62828;
+            opacity: 0.6;
+            border-color: #f44336;
+        }
+        
+        .interface-item.interface-used:hover {
+            background-color: #ffcdd2;
+            cursor: not-allowed;
+        }
+        
+        .dialog-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3 me-2"></i>
+                AI网络工程系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/chat">AI聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/topology">网络拓扑</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/develop">开发页面</a>
+                    </li>
+                </ul>
+                
+                <!-- 用户信息 -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown" id="userSection" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="/api/settings"><i class="fas fa-cog me-2"></i>用户设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-item" id="authSection">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid h-100">
+        <div class="row h-100">
+            <!-- 侧边栏 -->
+            <div class="col-md-3 sidebar">
+                <div class="sidebar-header">
+                    <h5><i class="bi bi-diagram-2 me-2"></i>网络拓扑管理</h5>
+                </div>
+                
+                <!-- 模式切换 -->
+                <div class="mode-selector mb-3">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="topologyMode" id="autoMode" value="auto" checked>
+                        <label class="btn btn-outline-primary" for="autoMode">
+                            <i class="bi bi-magic me-1"></i>自动模式
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="topologyMode" id="manualMode" value="manual">
+                        <label class="btn btn-outline-success" for="manualMode">
+                            <i class="bi bi-pencil me-1"></i>手动模式
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 模式说明 -->
+                <div class="mode-description">
+                    <div id="autoModeDesc" class="mode-desc active">
+                        <h6><i class="fas fa-info-circle me-2"></i>自动模式</h6>
+                        <p class="small text-muted">在此模式下，系统将：</p>
+                        <ul class="small text-muted">
+                            <li>自动扫描网络设备</li>
+                            <li>发现设备连接关系</li>
+                            <li>生成网络拓扑图</li>
+                            <li>实时更新设备状态</li>
+                        </ul>
+                    </div>
+                    <div id="manualModeDesc" class="mode-desc" style="display: none;">
+                        <h6><i class="fas fa-info-circle me-2"></i>手动模式</h6>
+                        <p class="small text-muted">在此模式下，您可以：</p>
+                        <ul class="small text-muted">
+                            <li>手动添加PC/Server设备</li>
+                            <li>自定义设备连接关系</li>
+                            <li>编辑设备属性信息</li>
+                            <li>保存自定义拓扑</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- 自动扫描控制 -->
+                <div id="autoControls" class="scan-controls">
+                    <h6><i class="fas fa-search me-2"></i>网络扫描</h6>
+                    <div class="d-grid gap-2 mb-3">
+                        <button class="btn btn-primary" id="startScanBtn" onclick="startNetworkScan()">
+                            <i class="fas fa-play me-1"></i>开始扫描
+                        </button>
+                        <button class="btn btn-warning" id="stopScanBtn" onclick="stopNetworkScan()" style="display: none;">
+                            <i class="fas fa-stop me-1"></i>停止扫描
+                        </button>
+                    </div>
+                    
+                    <!-- 扫描进度 -->
+                    <div class="scan-progress" id="scanProgress">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <small>扫描进度</small>
+                            <small id="scanPercentage">0%</small>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted" id="scanStatus">准备扫描...</small>
+                    </div>
+                </div>
+                
+                <!-- 本机信息 -->
+                <div class="local-device-info mb-3">
+                    <h6><i class="fas fa-laptop me-2"></i>本机信息</h6>
+                    <div class="card">
+                        <div class="card-body p-2">
+                            <div class="small">
+                                <div><strong>主机名:</strong> <span id="localHostname">-</span></div>
+                                <div><strong>IP地址:</strong> <span id="localIP">-</span></div>
+                                <div><strong>MAC地址:</strong> <span id="localMAC">-</span></div>
+                                <div><strong>网关:</strong> <span id="localGateway">-</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 手动设备管理 -->
+                <div id="manualControls" class="manual-controls" style="display: none;">
+                    <h6><i class="fas fa-plus me-2"></i>添加设备</h6>
+                    <div class="d-grid gap-2 mb-3">
+                        <div class="btn-group-vertical w-100">
+                            <button class="btn btn-success btn-sm" onclick="showAddDeviceForm('pc')">
+                                <i class="fas fa-desktop me-1"></i>PC
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="showAddDeviceForm('server')">
+                                <i class="fas fa-server me-1"></i>Server
+                            </button>
+                            <button class="btn btn-primary btn-sm" onclick="showAddDeviceForm('router')">
+                                <i class="fas fa-route me-1"></i>路由器
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="showAddDeviceForm('switch')">
+                                <i class="fas fa-network-wired me-1"></i>交换机
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="showAddDeviceForm('firewall')">
+                                <i class="fas fa-shield-alt me-1"></i>防火墙
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="showAddDeviceForm('ap')">
+                                <i class="fas fa-wifi me-1"></i>无线AP
+                            </button>
+                            <button class="btn btn-dark btn-sm" onclick="showAddDeviceForm('ac')">
+                                <i class="fas fa-broadcast-tower me-1"></i>无线AC
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 添加设备表单 -->
+                    <div class="manual-device-form" id="deviceForm">
+                        <h6 id="formTitle">添加设备</h6>
+                        <div class="mb-2">
+                            <label class="form-label">设备名称</label>
+                            <input type="text" class="form-control form-control-sm" id="deviceName" placeholder="输入设备名称">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">IP地址</label>
+                            <input type="text" class="form-control form-control-sm" id="deviceIP" placeholder="192.168.1.100">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">设备类型</label>
+                            <select class="form-select form-select-sm" id="deviceType">
+                                <option value="pc">PC</option>
+                                <option value="server">Server</option>
+                                <option value="router">路由器</option>
+                                <option value="switch">交换机</option>
+                                <option value="firewall">防火墙</option>
+                                <option value="ap">无线AP</option>
+                                <option value="ac">无线AC</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">品牌</label>
+                            <select class="form-select form-select-sm" id="deviceBrand" onchange="updateModelOptions()">
+                                <option value="">选择品牌</option>
+                                <option value="cisco">Cisco</option>
+                                <option value="huawei">华为</option>
+                                <option value="h3c">H3C</option>
+                                <option value="ruijie">锐捷</option>
+                                <option value="tp-link">TP-Link</option>
+                                <option value="netgear">Netgear</option>
+                                <option value="dell">Dell</option>
+                                <option value="hp">HP</option>
+                                <option value="lenovo">联想</option>
+                                <option value="dcn">神州数码</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">型号</label>
+                            <select class="form-select form-select-sm" id="deviceModel">
+                                <option value="">选择型号</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">SSH用户名</label>
+                            <input type="text" class="form-control form-control-sm" id="deviceUsername" placeholder="admin">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">SSH密码</label>
+                            <input type="password" class="form-control form-control-sm" id="devicePassword" placeholder="密码">
+                        </div>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary btn-sm" onclick="addManualDevice()">
+                                <i class="fas fa-plus me-1"></i>添加设备
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="hideAddDeviceForm()">
+                                <i class="fas fa-times me-1"></i>取消
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 设备列表 -->
+                <div class="discovered-devices">
+                    <h6><i class="fas fa-list me-2"></i>发现的设备</h6>
+                    <div class="device-list" id="deviceList">
+                        <div class="text-muted text-center py-3">
+                            <i class="fas fa-search me-2"></i>
+                            暂无设备，请开始扫描
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 连通性测试 -->
+                <div class="connectivity-test">
+                    <h6><i class="fas fa-wifi me-2"></i>连通性测试</h6>
+                    <div class="input-group mb-2">
+                        <input type="text" class="form-control form-control-sm" id="testTarget" placeholder="输入IP地址">
+                        <button class="btn btn-outline-primary btn-sm" onclick="testConnectivity()">
+                            <i class="fas fa-play me-1"></i>测试
+                        </button>
+                    </div>
+                    <div class="d-grid gap-2 mb-2">
+                        <button class="btn btn-warning btn-sm" id="globalTestBtn" onclick="testGlobalConnectivity()">
+                            <i class="fas fa-globe me-1"></i>全局连通性测试
+                        </button>
+                    </div>
+                    <div class="test-result" id="testResult"></div>
+                    <div class="global-test-result" id="globalTestResult" style="display: none;">
+                        <div class="small">
+                            <div class="mb-2"><strong>全局测试进度:</strong></div>
+                            <div class="progress mb-2" style="height: 15px;">
+                                <div class="progress-bar" id="globalTestProgress" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <div id="globalTestDetails"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 导入导出 -->
+                <div class="import-export-section">
+                    <h6><i class="fas fa-exchange-alt me-2"></i>导入导出</h6>
+                    <div class="d-grid gap-2 mb-2">
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-outline-info w-100">
+                                <i class="fas fa-upload me-1"></i>导入拓扑
+                            </button>
+                            <input type="file" id="importFile" accept=".json,.xml" onchange="importTopology()">
+                        </div>
+                        <button class="btn btn-outline-success" onclick="exportTopology()">
+                            <i class="fas fa-download me-1"></i>导出拓扑
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="loadFromCloud()">
+                            <i class="fas fa-cloud-download-alt me-1"></i>云端加载
+                        </button>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="zabbixFormat">
+                        <label class="form-check-label" for="zabbixFormat">
+                            Zabbix格式兼容
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 拓扑文本视图 -->
+                <div class="topology-text-view" id="topologyTextView"></div>
+                <button class="btn btn-sm btn-outline-secondary mt-2" onclick="toggleTextView()" id="toggleTextBtn">
+                    <i class="fas fa-eye me-1"></i>显示文本视图
+                </button>
+            </div>
+            
+            <!-- 主要内容区域 -->
+            <div class="col-md-9 main-content">
+                <div class="topology-container">
+                    <!-- 工具栏 -->
+                    <div class="topology-toolbar">
+                        <div class="toolbar-left d-flex align-items-center gap-2">
+                            <button class="btn btn-outline-secondary" onclick="resetView()">
+                                <i class="fas fa-home me-1"></i>重置视图
+                            </button>
+                            <button class="btn btn-outline-info" onclick="fitToScreen()">
+                                <i class="fas fa-expand me-1"></i>适应屏幕
+                            </button>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-secondary" onclick="zoomIn()">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="zoomOut()">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="toolbar-right">
+                            <span class="badge bg-secondary" id="topologyStatus">就绪</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 拓扑画布 -->
+                    <div class="topology-canvas">
+                        <canvas id="topologyCanvas"></canvas>
+                        
+                        <!-- 拓扑信息 -->
+                        <div class="topology-info">
+                            <div><strong>设备总数:</strong> <span id="totalDevices">0</span></div>
+                            <div><strong>在线设备:</strong> <span id="onlineDevices">0</span></div>
+                            <div><strong>连接数:</strong> <span id="totalConnections">0</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="showDeviceInfo()">查看设备信息</div>
+        <div class="context-menu-item" onclick="connectToDevice()">连接到设备</div>
+        <div class="context-menu-item" onclick="openTerminal()">终端连接</div>
+        <div class="context-menu-item" onclick="editDevice()">编辑设备</div>
+        <div class="context-menu-item" onclick="deleteDevice()">删除设备</div>
+    </div>
+
+    <!-- 对话框遮罩 -->
+    <div id="dialogOverlay" class="dialog-overlay" onclick="closeAllDialogs()"></div>
+
+    <!-- 接口选择对话框 -->
+    <div id="interfaceDialog" class="interface-dialog">
+        <div class="interface-dialog-header">
+            <span id="interfaceDialogTitle">选择接口</span>
+            <button type="button" class="btn-close float-end" onclick="closeInterfaceDialog()"></button>
+        </div>
+        <div class="interface-dialog-body">
+            <div class="mb-3">
+                <label class="form-label">源设备: <span id="sourceDeviceName"></span></label>
+                <div id="sourceInterfaceList" class="interface-list"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">目标设备: <span id="targetDeviceName"></span></label>
+                <div id="targetInterfaceList" class="interface-list"></div>
+            </div>
+        </div>
+        <div class="interface-dialog-footer">
+            <button type="button" class="btn btn-secondary me-2" onclick="closeInterfaceDialog()">取消</button>
+            <button type="button" class="btn btn-primary" onclick="confirmConnection()">确认连接</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-5.1.3.bundle.min.js') }}"></script>
+    <script src="/static/js/main.js"></script>
+
+    <script src="/static/js/topology-storage.js"></script>
+    <script>
+        // 全局变量
+        let topologyData = { devices: [], connections: [] };
+        let canvas = null;
+        let ctx = null;
+        let currentMode = 'auto';
+        let isScanning = false;
+        let selectedDevices = [];
+        let viewOffset = { x: 0, y: 0 };
+        let zoomLevel = 1;
+        let isDragging = false;
+        let lastMousePos = { x: 0, y: 0 };
+        let selectedDevice = null;
+        let isDraggingDevice = false;
+        let localDeviceInfo = {};
+        
+        // 设备品牌型号数据
+        const deviceModels = {
+            cisco: ['ISR4321', 'ISR4331', 'ISR4351', 'ASA5506-X', 'ASA5516-X', 'Catalyst 2960-X', 'Catalyst 3850', 'Catalyst 9300', 'AIR-CAP3702I-C-K9', 'WLC5520'],
+            huawei: ['AR1220C', 'AR2220', 'AR3260', 'USG6000V', 'USG6300', 'S5700-28C-EI', 'S5720-32X-EI', 'S6720-30C-EI', 'AP4030DN', 'AC6605'],
+            h3c: ['MSR2630', 'MSR3610', 'MSR3640', 'F1000-C', 'F5000-C', 'S5130-28S-EI', 'S5560-32C-EI', 'S6520-32C-EI', 'WA2620E-AGN', 'WX3010H'],
+            ruijie: ['RG-RSR20-04', 'RG-RSR30-14', 'RG-WALL1600', 'RG-WALL1800', 'RG-S2910-24GT4XS-E', 'RG-S5750C-28SFP+', 'RG-AP630(CD)', 'RG-WS6008'],
+            'tp-link': ['TL-R470T+', 'TL-R473GP-AC', 'TL-SG1016D', 'TL-SG1024D', 'TL-SG3428', 'EAP245', 'EAP660 HD', 'OC200'],
+            netgear: ['R6400', 'R7000', 'GS108', 'GS116', 'GS728TP', 'WAX610', 'WAX620', 'WC7600'],
+            dell: ['PowerEdge R740', 'PowerEdge R640', 'PowerEdge T340', 'OptiPlex 7090', 'Latitude 5520'],
+            hp: ['ProLiant DL380', 'ProLiant DL360', 'EliteDesk 800', 'EliteBook 850'],
+            lenovo: ['ThinkSystem SR650', 'ThinkCentre M720', 'ThinkPad X1 Carbon'],
+            dcn: ['ES420-10P-POE', 'ES420-18P', 'ES420-26P-POE', 'ES460-10P-PL', 'ES460-52X', 'ES550-28T', 'ES550-28C', 'ES550-52X-POE', 'CS6200-28X-Pro', 'DCRS-5960', 'DCRS-7606', 'DCRS-9306', 'DCWS-6002', 'DCWS-6028', 'DCWS-6108', 'DCFW-1800E', 'DCFW-3200E', 'DCFW-5500E', 'DCAP-2610', 'DCAP-2630', 'DCAP-3610', 'DCAP-3630', 'DCAC-6000', 'DCAC-8000'],
+            other: ['自定义型号']
+        };
+        
+        // 初始化标志
+        let isInitialized = false;
+        
+        // 数据持久化定时器
+        let dataPersistenceTimer = null;
+        let lastDataSnapshot = null;
+        
+        // 用户认证检查
+        function checkAuthentication() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user_info');
+            
+            if (!token || !user) {
+                window.location.href = '/login';
+                return false;
+            }
+            
+            try {
+                const userData = JSON.parse(user);
+                document.getElementById('currentUsername').textContent = userData.username || '用户';
+                return true;
+            } catch (error) {
+                console.error('解析用户数据失败:', error);
+                window.location.href = '/login';
+                return false;
+            }
+        }
+        
+        // 登出功能
+        async function logout() {
+            try {
+                // 调用后端登出API
+                await fetch('/auth/logout', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            } finally {
+                // 无论API调用是否成功，都清除本地存储并跳转
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user_info');
+                window.location.href = '/login';
+            }
+        }
+        
+        // 统一初始化函数
+        function initializeTopologyPage() {
+            if (isInitialized) return;
+            
+            // 检查用户认证
+            if (!checkAuthentication()) {
+                return;
+            }
+            
+            isInitialized = true;
+            
+            initializeCanvas();
+            setupEventListeners();
+            loadLocalDeviceInfo();
+            
+            // 设置云端同步
+            setupCloudSync();
+            
+            // 启动数据持久化机制
+            startDataPersistence();
+            
+            // 尝试从存储加载数据
+            try {
+                const dataLoaded = loadTopologyView();
+                console.log('从存储加载数据结果:', dataLoaded);
+                
+                // 如果没有存储的数据，尝试从备份恢复
+                if (!dataLoaded) {
+                    console.log('未找到存储数据，尝试从备份恢复');
+                    if (!restoreFromBackup()) {
+                        console.log('备份恢复失败，从服务器加载');
+                        loadTopologyData();
+                    }
+                }
+            } catch (error) {
+                console.error('从存储加载数据失败:', error);
+                // 如果存储加载失败，尝试从备份恢复
+                if (!restoreFromBackup()) {
+                    console.log('备份恢复失败，从服务器加载');
+                    loadTopologyData();
+                }
+            }
+            
+            console.log('拓扑页面初始化完成');
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTopologyPage();
+        });
+        
+        // 加载本机设备信息
+        function loadLocalDeviceInfo() {
+            console.log('开始获取本机设备信息...');
+            fetch('/api/topology/local-info')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('本机信息获取成功:', data);
+                localDeviceInfo = data;
+                
+                // 更新UI显示
+                document.getElementById('localHostname').textContent = data.hostname || '-';
+                document.getElementById('localIP').textContent = data.ip || '-';
+                document.getElementById('localMAC').textContent = data.mac || '-';
+                document.getElementById('localGateway').textContent = data.gateway || '-';
+                
+                // 将本机添加到拓扑中
+                addLocalDeviceToTopology();
+                
+                // 保存本机信息到本地存储
+                try {
+                    localStorage.setItem('local_device_info', JSON.stringify(data));
+                } catch (e) {
+                    console.warn('保存本机信息到本地存储失败:', e);
+                }
+            })
+            .catch(error => {
+                console.error('获取本机信息失败:', error);
+                
+                // 尝试从本地存储恢复
+                try {
+                    const cachedInfo = localStorage.getItem('local_device_info');
+                    if (cachedInfo) {
+                        const data = JSON.parse(cachedInfo);
+                        localDeviceInfo = data;
+                        document.getElementById('localHostname').textContent = data.hostname || 'localhost';
+                        document.getElementById('localIP').textContent = data.ip || '127.0.0.1';
+                        document.getElementById('localMAC').textContent = data.mac || '-';
+                        document.getElementById('localGateway').textContent = data.gateway || '-';
+                        addLocalDeviceToTopology();
+                        console.log('从本地存储恢复本机信息成功');
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('从本地存储恢复本机信息失败:', e);
+                }
+                
+                // 使用默认值并初始化本机设备
+                localDeviceInfo = {
+                    hostname: 'localhost',
+                    ip: '127.0.0.1',
+                    mac: null,
+                    gateway: null,
+                    system: 'Unknown',
+                    interfaces: []
+                };
+                
+                document.getElementById('localHostname').textContent = 'localhost';
+                document.getElementById('localIP').textContent = '127.0.0.1';
+                document.getElementById('localMAC').textContent = '-';
+                document.getElementById('localGateway').textContent = '-';
+                
+                // 即使获取失败也要添加本机设备
+                addLocalDeviceToTopology();
+            });
+        }
+        
+        // 将本机添加到拓扑中
+        function addLocalDeviceToTopology() {
+            if (!localDeviceInfo) {
+                console.warn('本机设备信息不可用，跳过添加');
+                return;
+            }
+            
+            const localIP = localDeviceInfo.ip || '127.0.0.1';
+            const localHostname = localDeviceInfo.hostname || 'localhost';
+            
+            console.log('尝试添加本机设备到拓扑:', { ip: localIP, hostname: localHostname });
+            
+            // 确保devices数组存在
+            if (!topologyData.devices) topologyData.devices = [];
+            
+            // 检查是否已存在本机设备（多种匹配方式）
+            let existingLocalDevice = topologyData.devices.find(d => 
+                d.id === 'local_device' || 
+                d.isLocal === true ||
+                d.ip === localIP ||
+                d.name === localHostname ||
+                (d.device_id && d.device_id === 'local_device')
+            );
+            
+            if (existingLocalDevice) {
+                console.log('本机设备已存在，更新信息:', existingLocalDevice);
+                // 如果已存在，更新信息
+                existingLocalDevice.name = localHostname;
+                existingLocalDevice.ip = localIP;
+                existingLocalDevice.hostname = localHostname;
+                existingLocalDevice.ip_address = localIP;
+                existingLocalDevice.mac_address = localDeviceInfo.mac || existingLocalDevice.mac_address;
+                existingLocalDevice.status = 'online';
+                existingLocalDevice.isLocal = true;
+                existingLocalDevice.is_local = true;
+                existingLocalDevice.device_type = existingLocalDevice.device_type || 'pc';
+                existingLocalDevice.brand = existingLocalDevice.brand || 'Local';
+                existingLocalDevice.model = localDeviceInfo.system || existingLocalDevice.model || 'localhost';
+                existingLocalDevice.os_version = localDeviceInfo.system || existingLocalDevice.os_version;
+                existingLocalDevice.last_seen = new Date().toISOString();
+                existingLocalDevice.updated_at = new Date().toISOString();
+                console.log('本机设备信息已更新');
+            } else {
+                console.log('添加新的本机设备');
+                // 如果不存在，添加新的本机设备
+                const localDevice = {
+                    id: 'local_device',
+                    device_id: 'local_device',
+                    name: localHostname,
+                    hostname: localHostname,
+                    ip: localIP,
+                    ip_address: localIP,
+                    device_type: 'pc',
+                    brand: 'Local',
+                    vendor: 'Local',
+                    model: localDeviceInfo.system || 'localhost',
+                    os_version: localDeviceInfo.system || null,
+                    mac_address: localDeviceInfo.mac || null,
+                    status: 'online',
+                    x: 50,
+                    y: 50,
+                    isLocal: true,
+                    is_local: true,
+                    last_seen: new Date().toISOString(),
+                    configuration: localDeviceInfo.interfaces ? { interfaces: localDeviceInfo.interfaces } : {},
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                topologyData.devices.unshift(localDevice); // 添加到开头
+                console.log('本机设备已添加到拓扑');
+            }
+            
+            // 更新UI
+            drawTopology();
+            updateDeviceList();
+            updateTopologyInfo();
+            
+            // 保存到后端
+            try {
+                if (window.topologyStorage) {
+                    window.topologyStorage.saveTopologyData(topologyData, currentMode, true, true);
+                    console.log('本机设备信息已保存');
+                } else {
+                    saveTopologyDataToLocal();
+                    console.log('本机设备信息已保存到本地');
+                }
+            } catch (error) {
+                console.error('保存本机设备信息失败:', error);
+            }
+        }
+        
+        // 初始化画布
+        function initializeCanvas() {
+            canvas = document.getElementById('topologyCanvas');
+            ctx = canvas.getContext('2d');
+            
+            // 设置画布大小
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // 绘制初始状态
+            drawTopology();
+        }
+        
+        // 调整画布大小
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            drawTopology();
+        }
+        
+        // 更新设备状态
+        function updateDeviceStatus(deviceIP, status) {
+            if (!topologyData.devices) return;
+            
+            // 查找设备并更新状态
+            const device = topologyData.devices.find(d => 
+                d.ip === deviceIP || 
+                d.ip_address === deviceIP ||
+                d.device_id === deviceIP
+            );
+            
+            if (device) {
+                device.status = status;
+                device.last_seen = new Date().toISOString();
+                device.updated_at = new Date().toISOString();
+                
+                console.log(`设备 ${deviceIP} 状态已更新为: ${status}`);
+                
+                // 保存更新到后端
+                try {
+                    if (window.topologyStorage) {
+                        window.topologyStorage.saveTopologyData(topologyData, currentMode, true, false);
+                    } else {
+                        saveTopologyDataToLocal();
+                    }
+                } catch (error) {
+                    console.error('保存设备状态更新失败:', error);
+                }
+            } else {
+                console.warn(`未找到IP为 ${deviceIP} 的设备`);
+            }
+        }
+        
+
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 模式切换
+            document.querySelectorAll('input[name="topologyMode"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    switchMode(this.value);
+                });
+            });
+            
+            // 事件监听器
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('wheel', handleWheel);
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // 禁用默认右键菜单
+        
+        // 点击其他地方隐藏右键菜单
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#contextMenu')) {
+                hideContextMenu();
+            }
+        });
+        
+        // ESC键关闭对话框
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeAllDialogs();
+                if (connectionMode) {
+                    exitConnectionMode();
+                }
+            }
+        });
+        }
+        
+        // 切换模式
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            if (mode === 'auto') {
+                document.getElementById('autoModeDesc').style.display = 'block';
+                document.getElementById('manualModeDesc').style.display = 'none';
+                document.getElementById('autoControls').style.display = 'block';
+                document.getElementById('manualControls').style.display = 'none';
+            } else {
+                document.getElementById('autoModeDesc').style.display = 'none';
+                document.getElementById('manualModeDesc').style.display = 'block';
+                document.getElementById('autoControls').style.display = 'none';
+                document.getElementById('manualControls').style.display = 'block';
+            }
+            
+            updateTopologyStatus('模式已切换到: ' + (mode === 'auto' ? '自动模式' : '手动模式'));
+        }
+        
+        // 开始网络扫描
+        function startNetworkScan() {
+            if (isScanning) return;
+            
+            isScanning = true;
+            document.getElementById('startScanBtn').style.display = 'none';
+            document.getElementById('stopScanBtn').style.display = 'block';
+            document.getElementById('scanProgress').style.display = 'block';
+            
+            updateTopologyStatus('正在扫描网络...');
+            
+            fetch('/api/topology/advanced-scan', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    scan_type: 'full',
+                    depth: 3,
+                    concurrency: 50,
+                    timeout: 5
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'started') {
+                    console.log('扫描已开始');
+                } else {
+                    throw new Error(data.message || '启动扫描失败');
+                }
+            })
+            .catch(error => {
+                console.error('扫描启动失败:', error);
+                stopNetworkScan();
+                updateTopologyStatus('扫描启动失败: ' + error.message);
+            });
+        }
+        
+        // 停止网络扫描
+        function stopNetworkScan() {
+            if (!isScanning) return;
+            
+            fetch('/api/topology/stop-scan', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('扫描已停止');
+            })
+            .catch(error => {
+                console.error('停止扫描失败:', error);
+            })
+            .finally(() => {
+                isScanning = false;
+                document.getElementById('startScanBtn').style.display = 'block';
+                document.getElementById('stopScanBtn').style.display = 'none';
+                document.getElementById('scanProgress').style.display = 'none';
+                updateTopologyStatus('扫描已停止');
+            });
+        }
+        
+        // 更新扫描进度
+        function updateScanProgress(progress, status) {
+            document.getElementById('scanPercentage').textContent = progress + '%';
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('scanStatus').textContent = status;
+        }
+        
+        // 处理扫描完成
+        function handleScanComplete(data) {
+            isScanning = false;
+            document.getElementById('startScanBtn').style.display = 'block';
+            document.getElementById('stopScanBtn').style.display = 'none';
+            document.getElementById('scanProgress').style.display = 'none';
+            
+            // 验证扫描结果数据
+            const scanResult = data.topology || { devices: [], connections: [] };
+            const validatedData = validateTopologyData(scanResult);
+            
+            // 只有当扫描到设备时才更新数据，避免空扫描结果覆盖现有数据
+            if (validatedData.devices.length > 0) {
+                // 合并扫描结果与现有数据，避免丢失手动添加的设备
+                const mergedData = mergeTopologyData(topologyData, validatedData);
+                topologyData = mergedData;
+                console.log('扫描完成，合并后设备数量:', topologyData.devices.length);
+            } else {
+                console.log('扫描未发现新设备，保持现有数据');
+            }
+            
+            drawTopology();
+            updateDeviceList();
+            updateTopologyInfo();
+            updateTopologyStatus('扫描完成，发现 ' + (validatedData.devices ? validatedData.devices.length : 0) + ' 个设备');
+            
+            // 保存拓扑视图
+            saveTopologyView();
+        }
+        
+        // 添加发现的设备
+        function addDiscoveredDevice(device) {
+            if (!topologyData.devices) topologyData.devices = [];
+            const existingIndex = topologyData.devices.findIndex(d => d.ip === device.ip);
+            
+            if (existingIndex >= 0) {
+                const existingDevice = topologyData.devices[existingIndex];
+                
+                // 如果现有设备是本机设备，保持其特殊属性
+                if (existingDevice.isLocal) {
+                    // 只更新状态等非关键属性，保持本机设备的特殊标识
+                    existingDevice.status = device.status || existingDevice.status;
+                    existingDevice.device_type = device.device_type || existingDevice.device_type;
+                    existingDevice.brand = device.brand || existingDevice.brand;
+                    existingDevice.model = device.model || existingDevice.model;
+                    console.log('本机设备信息已从扫描结果更新');
+                } else {
+                    // 普通设备直接替换
+                    topologyData.devices[existingIndex] = {
+                        ...existingDevice,
+                        ...device,
+                        // 保持原有位置
+                        x: existingDevice.x || Math.random() * 400 + 100,
+                        y: existingDevice.y || Math.random() * 300 + 100
+                    };
+                }
+            } else {
+                // 检查是否是本机IP，避免重复添加本机设备
+                const isLocalIP = localDeviceInfo && (device.ip === localDeviceInfo.ip || device.ip === '127.0.0.1');
+                const hasLocalDevice = (topologyData.devices || []).some(d => d.isLocal === true);
+                
+                if (!isLocalIP || !hasLocalDevice) {
+                    // 添加新设备，为其分配随机位置
+                    const newDevice = {
+                        ...device,
+                        x: Math.random() * 400 + 100,
+                        y: Math.random() * 300 + 100
+                    };
+                    if (!topologyData.devices) topologyData.devices = [];
+                topologyData.devices.push(newDevice);
+                    console.log('新设备已添加:', device.ip);
+                } else {
+                    console.log('跳过重复的本机设备:', device.ip);
+                }
+            }
+            
+            drawTopology();
+            updateDeviceList();
+            updateTopologyInfo();
+        }
+        
+        // 绘制拓扑图
+        function drawTopology() {
+            if (!ctx || !canvas) {
+                console.error('Canvas或Context未初始化');
+                return;
+            }
+            
+            // 绘制前验证数据完整性
+            if (!validateDataIntegrity()) {
+                console.warn('数据完整性检查失败，尝试从备份恢复');
+                if (restoreFromBackup()) {
+                    console.log('已从备份恢复，重新绘制');
+                } else {
+                    console.log('没有有效的拓扑数据可绘制');
+                    // 初始化空数据
+                    topologyData = { devices: [], connections: [] };
+                }
+            }
+            
+            // 检查topologyData是否存在
+            if (!topologyData) {
+                console.warn('拓扑数据未初始化');
+                topologyData = { devices: [], connections: [] };
+            }
+            
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 如果没有设备数据，显示提示信息
+            if (!topologyData.devices || topologyData.devices.length === 0) {
+                ctx.save();
+                ctx.fillStyle = '#666';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('暂无设备数据，请开始扫描或手动添加设备', canvas.width / 2, canvas.height / 2);
+                ctx.restore();
+                return;
+            }
+            
+            // 保存当前状态
+            ctx.save();
+            
+            // 应用变换
+            ctx.translate(viewOffset.x, viewOffset.y);
+            ctx.scale(zoomLevel, zoomLevel);
+            
+            // 绘制连接线
+            drawConnections();
+            
+            // 绘制设备
+            drawDevices();
+            
+            // 恢复状态
+            ctx.restore();
+        }
+        
+        // 绘制设备
+        function drawDevices() {
+            if (!topologyData || !topologyData.devices || topologyData.devices.length === 0) {
+                return;
+            }
+            
+            topologyData.devices.forEach((device, index) => {
+                const x = device.x || (100 + (index % 5) * 150);
+                const y = device.y || (100 + Math.floor(index / 5) * 100);
+                
+                // 更新设备位置
+                device.x = x;
+                device.y = y;
+                
+                // 绘制设备图标
+                drawDeviceIcon(x, y, device);
+                
+                // 绘制设备标签
+                drawDeviceLabel(x, y + 40, device);
+            });
+        }
+        
+        // 绘制设备图标
+        function drawDeviceIcon(x, y, device) {
+            const size = 30;
+            
+            // 设备背景
+            ctx.fillStyle = getDeviceColor(device);
+            ctx.fillRect(x - size/2, y - size/2, size, size);
+            
+            // 设备边框 - 本机设备使用特殊边框
+            if (device.isLocal) {
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([5, 3]); // 虚线边框
+            } else {
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]); // 实线边框
+            }
+            ctx.strokeRect(x - size/2, y - size/2, size, size);
+            ctx.setLineDash([]); // 重置线条样式
+            
+            // 本机设备标识
+            if (device.isLocal) {
+                ctx.fillStyle = '#22c55e';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('🏠', x, y + 5);
+            } else {
+                // 设备类型图标
+                ctx.fillStyle = '#333';
+                ctx.font = '16px Arial';
+                ctx.textAlign = 'center';
+                const icon = getDeviceIcon(device);
+                ctx.fillText(icon, x, y + 5);
+            }
+            
+            // 状态指示器
+            const statusColor = device.status === 'online' ? '#22c55e' : 
+                               device.status === 'offline' ? '#ef4444' : '#6b7280';
+            ctx.fillStyle = statusColor;
+            ctx.beginPath();
+            ctx.arc(x + size/2 - 5, y - size/2 + 5, 4, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+        
+        // 绘制设备标签
+        function drawDeviceLabel(x, y, device) {
+            ctx.textAlign = 'center';
+            
+            let name = device.name || device.ip || 'Unknown';
+            
+            // 本机设备特殊标识
+            if (device.isLocal) {
+                ctx.fillStyle = '#22c55e';
+                ctx.font = 'bold 12px Arial';
+                name = '🏠 ' + name + ' (本机)';
+            } else {
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+            }
+            
+            ctx.fillText(name, x, y);
+            
+            // 显示IP地址（如果有名称的话）
+            if (device.ip && device.name && !device.isLocal) {
+                ctx.fillStyle = '#666';
+                ctx.font = '10px Arial';
+                ctx.fillText(device.ip, x, y + 15);
+            } else if (device.isLocal && device.ip && device.name) {
+                ctx.fillStyle = '#22c55e';
+                ctx.font = '10px Arial';
+                ctx.fillText(device.ip, x, y + 15);
+            }
+        }
+        
+        // 绘制连接线
+        function drawConnections() {
+            if (!topologyData || !topologyData.connections || topologyData.connections.length === 0) {
+                return;
+            }
+            
+            topologyData.connections.forEach(connection => {
+                const device1 = topologyData.devices.find(d => d.id === connection.from);
+                const device2 = topologyData.devices.find(d => d.id === connection.to);
+                
+                if (device1 && device2) {
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(device1.x, device1.y);
+                    ctx.lineTo(device2.x, device2.y);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        // 获取设备颜色
+        function getDeviceColor(device) {
+            const type = device.device_type || device.type || 'unknown';
+            
+            // 本机设备特殊颜色
+            if (device.isLocal) {
+                return '#22c55e'; // 绿色表示本机
+            }
+            
+            switch (type.toLowerCase()) {
+                case 'router': return '#3b82f6';      // 蓝色
+                case 'switch': return '#10b981';      // 青色
+                case 'pc': return '#f59e0b';          // 橙色
+                case 'server': return '#8b5cf6';      // 紫色
+                case 'firewall': return '#ef4444';    // 红色
+                case 'ap': return '#06b6d4';          // 天蓝色
+                case 'ac': return '#0891b2';          // 深蓝色
+                default: return '#6b7280';           // 灰色
+            }
+        }
+        
+        // 获取设备图标
+        function getDeviceIcon(device) {
+            const type = device.device_type || device.type || 'unknown';
+            
+            switch (type.toLowerCase()) {
+                case 'router': return '🔀';
+                case 'switch': return '🔗';
+                case 'pc': return '💻';
+                case 'server': return '🖥️';
+                case 'firewall': return '🛡️';
+                case 'ap': return '📶';
+                case 'ac': return '📡';
+                default: return '❓';
+            }
+        }
+        
+        // 全局变量
+        let contextMenuDevice = null;
+        let connectionMode = false;
+        let sourceDevice = null;
+        let selectedSourceInterface = null;
+        let selectedTargetInterface = null;
+        
+        // 鼠标事件处理
+        function handleMouseDown(e) {
+            // 隐藏右键菜单
+            hideContextMenu();
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = (e.clientX - rect.left - viewOffset.x) / zoomLevel;
+            const mouseY = (e.clientY - rect.top - viewOffset.y) / zoomLevel;
+            
+            // 检查是否点击了设备
+            const clickedDevice = getDeviceAtPosition(mouseX, mouseY);
+            
+            if (e.button === 2) { // 右键
+                e.preventDefault();
+                if (clickedDevice) {
+                    showContextMenu(e.clientX, e.clientY, clickedDevice);
+                }
+                return;
+            }
+            
+            if (clickedDevice) {
+                if (connectionMode && sourceDevice && sourceDevice !== clickedDevice) {
+                    // 连接模式：选择目标设备
+                    showInterfaceSelectionDialog(sourceDevice, clickedDevice);
+                } else {
+                    selectedDevice = clickedDevice;
+                    isDraggingDevice = true;
+                    canvas.style.cursor = 'move';
+                }
+            } else {
+                selectedDevice = null;
+                isDragging = true;
+                canvas.style.cursor = 'grabbing';
+                
+                // 退出连接模式
+                if (connectionMode) {
+                    exitConnectionMode();
+                }
+            }
+            
+            lastMousePos = { x: e.clientX, y: e.clientY };
+        }
+        
+        function handleMouseMove(e) {
+            if (isDraggingDevice && selectedDevice) {
+                const deltaX = (e.clientX - lastMousePos.x) / zoomLevel;
+                const deltaY = (e.clientY - lastMousePos.y) / zoomLevel;
+                
+                selectedDevice.x += deltaX;
+                selectedDevice.y += deltaY;
+                
+                lastMousePos = { x: e.clientX, y: e.clientY };
+                drawTopology();
+            } else if (isDragging) {
+                const deltaX = e.clientX - lastMousePos.x;
+                const deltaY = e.clientY - lastMousePos.y;
+                
+                viewOffset.x += deltaX;
+                viewOffset.y += deltaY;
+                
+                lastMousePos = { x: e.clientX, y: e.clientY };
+                drawTopology();
+            }
+        }
+        
+        function handleMouseUp(e) {
+            isDragging = false;
+            isDraggingDevice = false;
+            selectedDevice = null;
+            canvas.style.cursor = 'grab';
+        }
+        
+        // 右键菜单功能
+        function showContextMenu(x, y, device) {
+            contextMenuDevice = device;
+            const menu = document.getElementById('contextMenu');
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.style.display = 'block';
+        }
+        
+        function hideContextMenu() {
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'none';
+            contextMenuDevice = null;
+        }
+        
+        function showDeviceInfo() {
+            if (!contextMenuDevice) return;
+            
+            const device = contextMenuDevice;
+            const info = `设备信息:\n` +
+                        `名称: ${device.name || '未知'}\n` +
+                        `IP: ${device.ip || '未知'}\n` +
+                        `MAC: ${device.mac || '未知'}\n` +
+                        `类型: ${getDeviceTypeName(device.device_type || device.type)}\n` +
+                        `品牌: ${device.brand || '未知'}\n` +
+                        `型号: ${device.model || '未知'}\n` +
+                        `状态: ${device.status === 'online' ? '在线' : device.status === 'offline' ? '离线' : '未知'}`;
+            
+            alert(info);
+            hideContextMenu();
+        }
+        
+        function connectToDevice() {
+            if (!contextMenuDevice) return;
+            
+            sourceDevice = contextMenuDevice;
+            connectionMode = true;
+            canvas.style.cursor = 'crosshair';
+            
+            // 高亮显示源设备
+            drawTopology();
+            highlightDevice(sourceDevice);
+            
+            hideContextMenu();
+            alert('连接模式已激活，请点击目标设备进行连接');
+        }
+        
+        function editDevice() {
+            if (!contextMenuDevice) return;
+            
+            // 填充编辑表单
+            const device = contextMenuDevice;
+            document.getElementById('deviceName').value = device.name || '';
+            document.getElementById('deviceIP').value = device.ip || '';
+            document.getElementById('deviceMAC').value = device.mac || '';
+            document.getElementById('deviceType').value = device.device_type || device.type || 'pc';
+            document.getElementById('deviceBrand').value = device.brand || 'cisco';
+            updateModelOptions();
+            document.getElementById('deviceModel').value = device.model || '';
+            
+            // 填充SSH凭据
+            let username = '';
+            let password = '';
+            if (device.credentials) {
+                try {
+                    const credentials = JSON.parse(device.credentials);
+                    username = credentials.username || '';
+                    password = credentials.password || '';
+                } catch (e) {
+                    console.error('解析凭据失败:', e);
+                }
+            }
+            document.getElementById('deviceUsername').value = username;
+            document.getElementById('devicePassword').value = password;
+            
+            // 显示添加设备表单
+            showAddDeviceForm();
+            
+            hideContextMenu();
+        }
+        
+        function deleteDevice() {
+            if (!contextMenuDevice) return;
+            
+            if (confirm('确定要删除这个设备吗？')) {
+                const index = (topologyData.devices || []).findIndex(d => d === contextMenuDevice);
+                if (index >= 0) {
+                    if (topologyData.devices) {
+                    topologyData.devices.splice(index, 1);
+                }
+                    
+                    // 删除相关连接
+                    if (!topologyData.connections) topologyData.connections = [];
+                    topologyData.connections = topologyData.connections.filter(conn => 
+                        conn.from !== contextMenuDevice.id && conn.to !== contextMenuDevice.id
+                    );
+                    
+                    drawTopology();
+                    updateDeviceList();
+                    updateTopologyInfo();
+                    
+                    // 手动删除设备时保存到云端
+                    if (window.topologyStorage) {
+                        window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
+                    }
+                }
+            }
+            
+            hideContextMenu();
+        }
+        
+        function openTerminal() {
+            if (!contextMenuDevice) return;
+            
+            const device = contextMenuDevice;
+            const deviceIP = device.ip || device.ip_address || '';
+            const deviceName = device.name || deviceIP || '未知设备';
+            
+            if (!deviceIP) {
+                alert('无法连接到终端：设备IP地址未知');
+                hideContextMenu();
+                return;
+            }
+            
+            // 跳转到终端连接页面，并传递设备信息
+            const url = `/command_line?device=${encodeURIComponent(deviceIP)}&name=${encodeURIComponent(deviceName)}`;
+            window.open(url, '_blank');
+            
+            hideContextMenu();
+        }
+        
+        function exitConnectionMode() {
+            connectionMode = false;
+            sourceDevice = null;
+            canvas.style.cursor = 'grab';
+            drawTopology();
+        }
+        
+        function highlightDevice(device) {
+            if (!device || !ctx) return;
+            
+            ctx.save();
+            ctx.translate(viewOffset.x, viewOffset.y);
+            ctx.scale(zoomLevel, zoomLevel);
+            
+            // 绘制高亮边框
+            ctx.strokeStyle = '#ff6b35';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(device.x - 20, device.y - 20, 40, 40);
+            
+            ctx.restore();
+        }
+        
+        // 接口选择对话框功能
+        function showInterfaceSelectionDialog(sourceDevice, targetDevice) {
+            document.getElementById('sourceDeviceName').textContent = sourceDevice.name || sourceDevice.ip || '未知设备';
+            document.getElementById('targetDeviceName').textContent = targetDevice.name || targetDevice.ip || '未知设备';
+            
+            // 获取并显示接口列表
+            populateInterfaceList('sourceInterfaceList', sourceDevice);
+            populateInterfaceList('targetInterfaceList', targetDevice);
+            
+            // 显示对话框
+            document.getElementById('dialogOverlay').style.display = 'block';
+            document.getElementById('interfaceDialog').style.display = 'block';
+            
+            // 保存设备引用
+            window.currentSourceDevice = sourceDevice;
+            window.currentTargetDevice = targetDevice;
+        }
+        
+        function populateInterfaceList(containerId, device) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            const interfaces = getDeviceInterfaces(device);
+            const usedInterfaces = getUsedInterfaces(device.id || device.ip);
+            
+            interfaces.forEach((iface, index) => {
+                const item = document.createElement('div');
+                const isUsed = usedInterfaces.includes(iface.name);
+                
+                item.className = isUsed ? 'interface-item interface-used' : 'interface-item';
+                item.textContent = `${iface.name} - ${iface.description}${isUsed ? ' (已占用)' : ''}`;
+                
+                if (!isUsed) {
+                    item.onclick = () => selectInterface(containerId, item, iface);
+                } else {
+                    item.style.cursor = 'not-allowed';
+                    item.title = '此接口已被占用';
+                }
+                
+                container.appendChild(item);
+            });
+        }
+        
+        function getUsedInterfaces(deviceId) {
+            const usedInterfaces = [];
+            
+            // 遍历所有连接，找出该设备已使用的接口
+            (topologyData.connections || []).forEach(conn => {
+                if (conn.from === deviceId && conn.fromInterface) {
+                    usedInterfaces.push(conn.fromInterface);
+                }
+                if (conn.to === deviceId && conn.toInterface) {
+                    usedInterfaces.push(conn.toInterface);
+                }
+            });
+            
+            return usedInterfaces;
+        }
+        
+        function getDeviceInterfaces(device) {
+            const type = (device.device_type || device.type || 'pc').toLowerCase();
+            const brand = (device.brand || 'generic').toLowerCase();
+            
+            // 根据设备类型和品牌返回接口信息
+            const interfaceMap = {
+                'router': {
+                    'cisco': [
+                        { name: 'GigabitEthernet0/0', description: '千兆以太网接口 0/0' },
+                        { name: 'GigabitEthernet0/1', description: '千兆以太网接口 0/1' },
+                        { name: 'Serial0/0/0', description: '串行接口 0/0/0' },
+                        { name: 'Serial0/0/1', description: '串行接口 0/0/1' }
+                    ],
+                    'huawei': [
+                        { name: 'GigabitEthernet0/0/0', description: '千兆以太网接口 0/0/0' },
+                        { name: 'GigabitEthernet0/0/1', description: '千兆以太网接口 0/0/1' },
+                        { name: 'Serial0/0/0', description: '串行接口 0/0/0' },
+                        { name: 'Serial0/0/1', description: '串行接口 0/0/1' }
+                    ],
+                    'h3c': [
+                        { name: 'GigabitEthernet1/0/1', description: '千兆以太网接口 1/0/1' },
+                        { name: 'GigabitEthernet1/0/2', description: '千兆以太网接口 1/0/2' },
+                        { name: 'Serial2/0/0', description: '串行接口 2/0/0' }
+                    ],
+                    'dcn': [
+                        { name: 'GigabitEthernet0/1', description: '千兆以太网接口 0/1' },
+                        { name: 'GigabitEthernet0/2', description: '千兆以太网接口 0/2' },
+                        { name: 'Serial0/0', description: '串行接口 0/0' }
+                    ]
+                },
+                'switch': {
+                    'cisco': [
+                        { name: 'FastEthernet0/1', description: '快速以太网接口 0/1' },
+                        { name: 'FastEthernet0/2', description: '快速以太网接口 0/2' },
+                        { name: 'GigabitEthernet0/1', description: '千兆以太网接口 0/1' },
+                        { name: 'GigabitEthernet0/2', description: '千兆以太网接口 0/2' }
+                    ],
+                    'huawei': [
+                        { name: 'Ethernet0/0/1', description: '以太网接口 0/0/1' },
+                        { name: 'Ethernet0/0/2', description: '以太网接口 0/0/2' },
+                        { name: 'GigabitEthernet0/0/1', description: '千兆以太网接口 0/0/1' },
+                        { name: 'GigabitEthernet0/0/2', description: '千兆以太网接口 0/0/2' }
+                    ],
+                    'h3c': [
+                        { name: 'Ethernet1/0/1', description: '以太网接口 1/0/1' },
+                        { name: 'Ethernet1/0/2', description: '以太网接口 1/0/2' },
+                        { name: 'GigabitEthernet1/0/1', description: '千兆以太网接口 1/0/1' },
+                        { name: 'GigabitEthernet1/0/2', description: '千兆以太网接口 1/0/2' }
+                    ],
+                    'dcn': [
+                        { name: 'Ethernet1/1', description: '以太网接口 1/1' },
+                        { name: 'Ethernet1/2', description: '以太网接口 1/2' },
+                        { name: 'GigabitEthernet1/1', description: '千兆以太网接口 1/1' },
+                        { name: 'GigabitEthernet1/2', description: '千兆以太网接口 1/2' }
+                    ]
+                },
+                'pc': {
+                    'generic': [
+                        { name: 'Ethernet', description: '以太网适配器' },
+                        { name: 'Wi-Fi', description: '无线网络适配器' }
+                    ]
+                },
+                'server': {
+                    'generic': [
+                        { name: 'Ethernet1', description: '以太网适配器 1' },
+                        { name: 'Ethernet2', description: '以太网适配器 2' },
+                        { name: 'Management', description: '管理接口' }
+                    ]
+                },
+                'firewall': {
+                    'cisco': [
+                        { name: 'GigabitEthernet0/0', description: '内网接口' },
+                        { name: 'GigabitEthernet0/1', description: '外网接口' },
+                        { name: 'Management0/0', description: '管理接口' }
+                    ],
+                    'huawei': [
+                        { name: 'GigabitEthernet1/0/0', description: '内网接口' },
+                        { name: 'GigabitEthernet1/0/1', description: '外网接口' },
+                        { name: 'MGE0/0/0', description: '管理接口' }
+                    ],
+                    'dcn': [
+                        { name: 'GigabitEthernet0/1', description: '内网接口' },
+                        { name: 'GigabitEthernet0/2', description: '外网接口' },
+                        { name: 'Management0/1', description: '管理接口' }
+                    ]
+                },
+                'ap': {
+                    'generic': [
+                        { name: 'Ethernet', description: '以太网接口' },
+                        { name: 'Radio0', description: '2.4GHz无线接口' },
+                        { name: 'Radio1', description: '5GHz无线接口' }
+                    ]
+                },
+                'ac': {
+                    'generic': [
+                        { name: 'GigabitEthernet0/1', description: '千兆以太网接口 0/1' },
+                        { name: 'GigabitEthernet0/2', description: '千兆以太网接口 0/2' },
+                        { name: 'Management', description: '管理接口' }
+                    ]
+                }
+            };
+            
+            const typeInterfaces = interfaceMap[type] || interfaceMap['pc'];
+            return typeInterfaces[brand] || typeInterfaces['generic'] || [
+                { name: 'Ethernet0', description: '以太网接口 0' },
+                { name: 'Ethernet1', description: '以太网接口 1' }
+            ];
+        }
+        
+        function selectInterface(containerId, element, interfaceData) {
+            // 清除同一容器中其他选中状态
+            const container = document.getElementById(containerId);
+            container.querySelectorAll('.interface-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // 选中当前接口
+            element.classList.add('selected');
+            
+            // 保存选中的接口
+            if (containerId === 'sourceInterfaceList') {
+                selectedSourceInterface = interfaceData;
+            } else {
+                selectedTargetInterface = interfaceData;
+            }
+        }
+        
+        function confirmConnection() {
+            if (!selectedSourceInterface || !selectedTargetInterface) {
+                alert('请选择源设备和目标设备的接口');
+                return;
+            }
+            
+            // 检查接口是否已被占用
+            const sourceDeviceId = window.currentSourceDevice.id || window.currentSourceDevice.ip;
+            const targetDeviceId = window.currentTargetDevice.id || window.currentTargetDevice.ip;
+            
+            const sourceUsedInterfaces = getUsedInterfaces(sourceDeviceId);
+            const targetUsedInterfaces = getUsedInterfaces(targetDeviceId);
+            
+            if (sourceUsedInterfaces.includes(selectedSourceInterface.name)) {
+                alert(`源设备的接口 ${selectedSourceInterface.name} 已被占用，请选择其他接口`);
+                return;
+            }
+            
+            if (targetUsedInterfaces.includes(selectedTargetInterface.name)) {
+                alert(`目标设备的接口 ${selectedTargetInterface.name} 已被占用，请选择其他接口`);
+                return;
+            }
+            
+            // 检查是否已存在相同的连接
+            if (!topologyData.connections) topologyData.connections = [];
+            const existingConnection = topologyData.connections.find(conn => 
+                (conn.from === sourceDeviceId && conn.to === targetDeviceId && 
+                 conn.fromInterface === selectedSourceInterface.name && conn.toInterface === selectedTargetInterface.name) ||
+                (conn.from === targetDeviceId && conn.to === sourceDeviceId && 
+                 conn.fromInterface === selectedTargetInterface.name && conn.toInterface === selectedSourceInterface.name)
+            );
+            
+            if (existingConnection) {
+                alert('该连接已存在');
+                return;
+            }
+            
+            // 创建连接
+            const connection = {
+                id: Date.now().toString(),
+                from: sourceDeviceId,
+                to: targetDeviceId,
+                fromInterface: selectedSourceInterface.name,
+                toInterface: selectedTargetInterface.name,
+                type: 'ethernet'
+            };
+            
+            // 添加到连接列表
+            if (!topologyData.connections) topologyData.connections = [];
+                topologyData.connections.push(connection);
+            
+            // 重绘拓扑图
+            drawTopology();
+            updateTopologyInfo();
+            
+            // 手动添加连接时保存到云端
+            if (window.topologyStorage) {
+                window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
+                console.log('连接添加后已保存到云端');
+            }
+            
+            // 关闭对话框
+            closeInterfaceDialog();
+            
+            // 退出连接模式
+            exitConnectionMode();
+            
+            alert(`连接已创建：${window.currentSourceDevice.name || window.currentSourceDevice.ip} (${selectedSourceInterface.name}) <-> ${window.currentTargetDevice.name || window.currentTargetDevice.ip} (${selectedTargetInterface.name})`);
+        }
+        
+        function closeInterfaceDialog() {
+            document.getElementById('dialogOverlay').style.display = 'none';
+            document.getElementById('interfaceDialog').style.display = 'none';
+            selectedSourceInterface = null;
+            selectedTargetInterface = null;
+            window.currentSourceDevice = null;
+            window.currentTargetDevice = null;
+        }
+        
+        function closeAllDialogs() {
+            closeInterfaceDialog();
+            hideContextMenu();
+        }
+        
+        // 获取指定位置的设备
+        function getDeviceAtPosition(x, y) {
+            const deviceSize = 30;
+            
+            for (let device of (topologyData.devices || [])) {
+                const deviceX = device.x || 0;
+                const deviceY = device.y || 0;
+                
+                if (x >= deviceX - deviceSize/2 && x <= deviceX + deviceSize/2 &&
+                    y >= deviceY - deviceSize/2 && y <= deviceY + deviceSize/2) {
+                    return device;
+                }
+            }
+            
+            return null;
+        }
+        
+        function handleWheel(e) {
+            e.preventDefault();
+            
+            const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+            zoomLevel = Math.max(0.1, Math.min(3, zoomLevel * zoomFactor));
+            
+            drawTopology();
+        }
+        
+        // 视图控制
+        function resetView() {
+            viewOffset = { x: 0, y: 0 };
+            zoomLevel = 1;
+            drawTopology();
+        }
+        
+        function fitToScreen() {
+            if (!topologyData.devices || topologyData.devices.length === 0) return;
+            
+            // 计算设备边界
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            
+            (topologyData.devices || []).forEach(device => {
+                minX = Math.min(minX, device.x || 0);
+                minY = Math.min(minY, device.y || 0);
+                maxX = Math.max(maxX, device.x || 0);
+                maxY = Math.max(maxY, device.y || 0);
+            });
+            
+            const width = maxX - minX + 200;
+            const height = maxY - minY + 200;
+            
+            const scaleX = canvas.width / width;
+            const scaleY = canvas.height / height;
+            zoomLevel = Math.min(scaleX, scaleY, 1);
+            
+            viewOffset.x = (canvas.width - width * zoomLevel) / 2 - minX * zoomLevel + 100 * zoomLevel;
+            viewOffset.y = (canvas.height - height * zoomLevel) / 2 - minY * zoomLevel + 100 * zoomLevel;
+            
+            drawTopology();
+        }
+        
+        function zoomIn() {
+            zoomLevel = Math.min(3, zoomLevel * 1.2);
+            drawTopology();
+        }
+        
+        function zoomOut() {
+            zoomLevel = Math.max(0.1, zoomLevel / 1.2);
+            drawTopology();
+        }
+        
+        // 手动设备管理
+        function showAddDeviceForm(deviceType) {
+            document.getElementById('deviceType').value = deviceType;
+            document.getElementById('formTitle').textContent = '添加' + getDeviceTypeName(deviceType);
+            document.getElementById('deviceForm').style.display = 'block';
+            
+            // 清空表单
+            document.getElementById('deviceName').value = '';
+            document.getElementById('deviceIP').value = '';
+            document.getElementById('deviceBrand').value = '';
+            document.getElementById('deviceModel').value = '';
+            document.getElementById('deviceInterfaces').value = '';
+            
+            updateModelOptions();
+        }
+        
+        function getDeviceTypeName(type) {
+            const typeNames = {
+                'pc': 'PC',
+                'server': 'Server',
+                'router': '路由器',
+                'switch': '交换机',
+                'firewall': '防火墙',
+                'ap': '无线AP',
+                'ac': '无线AC'
+            };
+            return typeNames[type] || type;
+        }
+        
+        function updateModelOptions() {
+            const brand = document.getElementById('deviceBrand').value;
+            const modelSelect = document.getElementById('deviceModel');
+            
+            // 清空型号选项
+            modelSelect.innerHTML = '<option value="">选择型号</option>';
+            
+            if (brand && deviceModels[brand]) {
+                deviceModels[brand].forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+            }
+        }
+        
+        function hideAddDeviceForm() {
+            document.getElementById('deviceForm').style.display = 'none';
+        }
+        
+        function addManualDevice() {
+            const name = document.getElementById('deviceName').value.trim();
+            const ip = document.getElementById('deviceIP').value.trim();
+            const type = document.getElementById('deviceType').value;
+            const brand = document.getElementById('deviceBrand').value;
+            const model = document.getElementById('deviceModel').value;
+            const username = document.getElementById('deviceUsername').value.trim();
+            const password = document.getElementById('devicePassword').value.trim();
+            
+            if (!name || !ip) {
+                alert('请填写设备名称和IP地址');
+                return;
+            }
+            
+            // 准备凭据对象
+            let credentials = null;
+            if (username && password) {
+                credentials = JSON.stringify({
+                    username: username,
+                    password: password
+                });
+            }
+            
+            const device = {
+                id: 'manual_' + Date.now(),
+                name: name,
+                ip: ip,
+                device_type: type,
+                brand: brand,
+                model: model,
+                status: 'unknown',
+                credentials: credentials,
+                x: 100 + ((topologyData.devices ? topologyData.devices.length : 0) % 6) * 120,
+                y: 100 + Math.floor((topologyData.devices ? topologyData.devices.length : 0) / 6) * 120
+            };
+            
+            topologyData.devices.push(device);
+            drawTopology();
+            updateDeviceList();
+            updateTopologyInfo();
+            hideAddDeviceForm();
+            
+            // 手动添加设备时保存到云端
+            if (window.topologyStorage) {
+                window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
+            }
+            
+            updateTopologyStatus('已添加设备: ' + name);
+            
+            // 如果有SSH凭据，显示提示
+            if (credentials) {
+                updateTopologyStatus('已添加设备: ' + name + ' (SSH凭据已保存)');
+            } else {
+                updateTopologyStatus('已添加设备: ' + name);
+            }
+        }
+        
+        // 连通性测试 - 添加防抖和限流
+        let connectivityTestTimeout = null;
+        let lastConnectivityTest = 0;
+        
+        function testConnectivity() {
+            const target = document.getElementById('testTarget').value.trim();
+            if (!target) {
+                alert('请输入要测试的IP地址');
+                return;
+            }
+            
+            // 防抖：清除之前的定时器
+            if (connectivityTestTimeout) {
+                clearTimeout(connectivityTestTimeout);
+            }
+            
+            // 限流：检查距离上次测试的时间
+            const now = Date.now();
+            const timeSinceLastTest = now - lastConnectivityTest;
+            if (timeSinceLastTest < 1000) { // 1秒内只能测试一次
+                const remainingTime = 1000 - timeSinceLastTest;
+                connectivityTestTimeout = setTimeout(() => testConnectivity(), remainingTime);
+                return;
+            }
+            
+            lastConnectivityTest = now;
+            
+            const resultDiv = document.getElementById('testResult');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'test-result';
+            resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>正在测试连通性...';
+            
+            // 发送ICMP请求测试
+            fetch('/api/topology/ping', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ip: target, timeout: 2 }) // 减少超时时间
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.reachable) {
+                    resultDiv.className = 'test-result success';
+                    const latency = data.latency || data.response_time || 0;
+                    resultDiv.innerHTML = `<i class="fas fa-check me-2"></i>连通性测试成功<br><small>目标: ${target}<br>响应时间: ${latency}ms</small>`;
+                    
+                    // 更新设备在线状态
+                     updateDeviceStatus(target, 'online');
+                     drawTopology();
+                     updateTopologyInfo();
+                } else {
+                    resultDiv.className = 'test-result error';
+                    resultDiv.innerHTML = `<i class="fas fa-times me-2"></i>连通性测试失败<br><small>目标: ${target}<br>${data.error || '请检查网络连接'}</small>`;
+                    
+                    // 更新设备离线状态
+                     updateDeviceStatus(target, 'offline');
+                     drawTopology();
+                     updateTopologyInfo();
+                }
+            })
+            .catch(error => {
+                resultDiv.className = 'test-result error';
+                resultDiv.innerHTML = `<i class="fas fa-times me-2"></i>测试失败<br><small>错误: ${error.message}</small>`;
+            });
+        }
+        
+        // 全局连通性测试 - 添加并发控制
+        let globalTestRunning = false;
+        let globalTestAbortController = null;
+        
+        function testGlobalConnectivity() {
+            if (!topologyData.devices || topologyData.devices.length === 0) {
+                alert('没有发现设备，请先扫描网络');
+                return;
+            }
+            
+            if (globalTestRunning) {
+                // 如果正在测试，则停止当前测试
+                if (globalTestAbortController) {
+                    globalTestAbortController.abort();
+                }
+                globalTestRunning = false;
+                document.getElementById('globalTestBtn').textContent = '开始全局测试';
+                return;
+            }
+            
+            globalTestRunning = true;
+            globalTestAbortController = new AbortController();
+            document.getElementById('globalTestBtn').textContent = '停止测试';
+            
+            const globalResultDiv = document.getElementById('globalTestResult');
+            const progressBar = document.getElementById('globalTestProgress');
+            const detailsDiv = document.getElementById('globalTestDetails');
+            
+            globalResultDiv.style.display = 'block';
+            progressBar.style.width = '0%';
+            detailsDiv.innerHTML = '';
+            
+            // 获取所有非本机设备的IP
+            const targetIPs = (topologyData.devices || [])
+                .filter(device => !device.isLocal && device.ip)
+                .map(device => ({ ip: device.ip, name: device.name || device.ip }));
+            
+            if (targetIPs.length === 0) {
+                detailsDiv.innerHTML = '<div class="text-warning">没有找到可测试的设备IP地址</div>';
+                return;
+            }
+            
+            let completedTests = 0;
+            let successfulTests = 0;
+            const totalTests = targetIPs.length;
+            
+            detailsDiv.innerHTML = `<div class="mb-2">开始测试 ${totalTests} 个设备...</div>`;
+            
+            // 逐个测试设备连通性
+            targetIPs.forEach((target, index) => {
+                setTimeout(() => {
+                    if (!globalTestRunning) return; // 检查测试是否已停止
+                    
+                    fetch('/api/topology/ping', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ ip: target.ip, timeout: 2 }),
+                        signal: globalTestAbortController.signal // 支持取消请求
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        completedTests++;
+                        
+                        const resultClass = data.success && data.reachable ? 'text-success' : 'text-danger';
+                        const resultIcon = data.success && data.reachable ? '✓' : '✗';
+                        const resultText = data.success && data.reachable ? `${data.latency || data.response_time || 0}ms` : '超时';
+                        
+                        if (data.success && data.reachable) {
+                            successfulTests++;
+                            
+                            // 更新设备在线状态
+                            updateDeviceStatus(target.ip, 'online');
+                        } else {
+                            // 更新设备离线状态
+                            updateDeviceStatus(target.ip, 'offline');
+                        }
+                        
+                        detailsDiv.innerHTML += `<div class="${resultClass}">${resultIcon} ${target.name} (${target.ip}): ${resultText}</div>`;
+                        
+                        // 更新进度
+                        const progress = (completedTests / totalTests) * 100;
+                        progressBar.style.width = progress + '%';
+                        
+                        // 测试完成
+                        if (completedTests === totalTests) {
+                            const successRate = (successfulTests / totalTests * 100).toFixed(1);
+                            detailsDiv.innerHTML += `<div class="mt-2 fw-bold">测试完成: ${successfulTests}/${totalTests} 设备可达 (${successRate}%)</div>`;
+                            
+                            // 重新渲染拓扑图以显示更新的状态
+                             drawTopology();
+                             updateTopologyInfo();
+                            
+                            // 重置测试状态
+                            globalTestRunning = false;
+                            document.getElementById('globalTestBtn').textContent = '开始全局测试';
+                        }
+                    })
+                    .catch(error => {
+                        completedTests++;
+                        detailsDiv.innerHTML += `<div class="text-danger">✗ ${target.name} (${target.ip}): 测试失败</div>`;
+                        
+                        const progress = (completedTests / totalTests) * 100;
+                        progressBar.style.width = progress + '%';
+                    });
+                }, index * 1000); // 每1000ms测试一个设备，减少并发压力
+            });
+        }
+        
+        // 导入导出功能
+        function importTopology() {
+            const file = document.getElementById('importFile').files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // 检查是否为Zabbix格式
+                    if (data.zabbix_export) {
+                        topologyData = convertZabbixFormat(data);
+                    } else {
+                        topologyData = data;
+                    }
+                    
+                    drawTopology();
+                    updateDeviceList();
+                    updateTopologyInfo();
+                    updateTopologyStatus('拓扑导入成功');
+                } catch (error) {
+                    alert('导入失败: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function exportTopology() {
+            const isZabbixFormat = document.getElementById('zabbixFormat').checked;
+            let exportData;
+            
+            if (isZabbixFormat) {
+                exportData = convertToZabbixFormat(topologyData);
+            } else {
+                exportData = topologyData;
+            }
+            
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'network_topology_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            updateTopologyStatus('拓扑导出成功');
+        }
+        
+        function loadFromCloud() {
+            updateTopologyStatus('正在从云端加载拓扑数据...');
+            
+            fetch('/api/topology/load')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('云端拓扑数据加载成功:', data);
+                console.log('原始云端数据结构:', JSON.stringify(data, null, 2));
+                
+                if (data.success && data.data) {
+                    console.log('云端数据详情:', data.data);
+                    console.log('云端数据中的data字段:', data.data.data);
+                    
+                    // 检查数据结构
+                    let dataToValidate;
+                    if (data.data.data && (data.data.data.devices || data.data.data.nodes)) {
+                        // 如果data.data.data存在且包含设备信息，使用它
+                        dataToValidate = data.data.data;
+                        console.log('使用data.data.data作为验证数据:', dataToValidate);
+                    } else if (data.data.devices || data.data.nodes) {
+                        // 如果data.data直接包含设备信息，使用它
+                        dataToValidate = data.data;
+                        console.log('使用data.data作为验证数据:', dataToValidate);
+                    } else {
+                        console.warn('未找到有效的设备数据结构');
+                        dataToValidate = { devices: [], connections: [] };
+                    }
+                    
+                    // 验证云端数据
+                    const newData = validateTopologyData(dataToValidate);
+                    console.log('验证后的数据:', newData);
+                    console.log('验证后设备数量:', newData.devices.length);
+                    
+                    if (newData.devices.length > 0) {
+                        // 询问用户是否要替换当前数据
+                        const confirmMessage = `发现云端拓扑数据包含 ${newData.devices.length} 个设备。\n当前本地数据包含 ${topologyData.devices.length} 个设备。\n\n是否要用云端数据替换当前数据？`;
+                        
+                        if (topologyData.devices.length === 0 || confirm(confirmMessage)) {
+                            // 备份当前数据
+                            const currentDataBackup = JSON.parse(JSON.stringify(topologyData));
+                            
+                            // 更新拓扑数据
+                            topologyData = newData;
+                            topologyData.timestamp = data.data.timestamp || data.timestamp || new Date().toISOString();
+                            
+                            // 更新界面
+                            drawTopology();
+                            updateDeviceList();
+                            updateTopologyInfo();
+                            updateTopologyStatus(`已从云端加载拓扑数据，包含 ${newData.devices.length} 个设备`);
+                            
+                            // 保存到本地存储
+                            saveTopologyDataToLocal();
+                            updateLastDataSnapshot();
+                            
+                            console.log('云端数据加载完成，设备数量:', topologyData.devices.length);
+                        } else {
+                            updateTopologyStatus('用户取消了云端数据加载');
+                        }
+                    } else {
+                        updateTopologyStatus('云端数据为空，保持当前数据');
+                        console.log('验证后云端数据为空');
+                        console.log('原始云端数据:', data.data);
+                        console.log('验证输入数据:', dataToValidate);
+                    }
+                } else {
+                    console.error('云端响应格式错误:', data);
+                    throw new Error(data.error || '云端数据格式无效');
+                }
+            })
+            .catch(error => {
+                console.error('从云端加载拓扑数据失败:', error);
+                updateTopologyStatus('云端加载失败: ' + error.message);
+                
+                // 显示错误提示
+                if (error.message.includes('401') || error.message.includes('403')) {
+                    alert('请先登录后再尝试加载云端数据');
+                } else if (error.message.includes('404')) {
+                    alert('云端暂无拓扑数据，请先保存数据到云端');
+                } else {
+                    alert('从云端加载数据失败: ' + error.message);
+                }
+            });
+        }
+        
+        // Zabbix格式转换
+        function convertZabbixFormat(zabbixData) {
+            // 简化的Zabbix格式转换
+            const devices = [];
+            const connections = [];
+            
+            if (zabbixData.zabbix_export && zabbixData.zabbix_export.hosts) {
+                zabbixData.zabbix_export.hosts.forEach((host, index) => {
+                    devices.push({
+                        id: host.host,
+                        name: host.name || host.host,
+                        ip: host.interfaces?.[0]?.ip || '',
+                        device_type: 'server',
+                        status: 'unknown',
+                        x: 100 + (index % 5) * 150,
+                        y: 100 + Math.floor(index / 5) * 100
+                    });
+                });
+            }
+            
+            return { devices, connections };
+        }
+        
+        function convertToZabbixFormat(topologyData) {
+            const hosts = (topologyData.devices || []).map(device => ({
+                host: device.id,
+                name: device.name,
+                interfaces: [{
+                    ip: device.ip,
+                    dns: '',
+                    port: '10050'
+                }]
+            }));
+            
+            return {
+                zabbix_export: {
+                    version: '5.0',
+                    date: new Date().toISOString(),
+                    hosts: hosts
+                }
+            };
+        }
+        
+        // 文本视图
+        function toggleTextView() {
+            const textView = document.getElementById('topologyTextView');
+            const toggleBtn = document.getElementById('toggleTextBtn');
+            
+            if (textView.style.display === 'none' || !textView.style.display) {
+                textView.style.display = 'block';
+                textView.textContent = generateTopologyText();
+                toggleBtn.innerHTML = '<i class="fas fa-eye-slash me-1"></i>隐藏文本视图';
+            } else {
+                textView.style.display = 'none';
+                toggleBtn.innerHTML = '<i class="fas fa-eye me-1"></i>显示文本视图';
+            }
+        }
+        
+        function generateTopologyText() {
+            let text = '网络拓扑结构\n';
+            text += '================\n\n';
+            
+            text += '设备列表:\n';
+            (topologyData.devices || []).forEach(device => {
+                const deviceType = device.isLocal ? '本机设备' : device.device_type;
+                const localFlag = device.isLocal ? ' 🏠' : '';
+                text += `- ${device.name || device.ip}${localFlag} (${deviceType}) [${device.status}]\n`;
+                if (device.ip) text += `  IP: ${device.ip}\n`;
+                if (device.mac) text += `  MAC: ${device.mac}\n`;
+                if (device.brand && device.model) text += `  型号: ${device.brand} ${device.model}\n`;
+                
+                // 显示设备接口信息
+                if (localDeviceInfo && device.isLocal && localDeviceInfo.interfaces) {
+                    text += `  网络接口:\n`;
+                    localDeviceInfo.interfaces.forEach(iface => {
+                        text += `    - ${iface.name}`;
+                        if (iface.mac) text += ` (MAC: ${iface.mac})`;
+                        text += `\n`;
+                        iface.addresses.forEach(addr => {
+                            text += `      ${addr.type}: ${addr.address}`;
+                            if (addr.netmask) text += `/${addr.netmask}`;
+                            text += `\n`;
+                        });
+                    });
+                }
+                text += `\n`;
+            });
+            
+            text += '连接关系:\n';
+            if (!topologyData.connections || topologyData.connections.length === 0) {
+                text += '暂无连接关系\n';
+            } else {
+                (topologyData.connections || []).forEach(conn => {
+                    const device1 = (topologyData.devices || []).find(d => d.id === conn.from);
+                    const device2 = (topologyData.devices || []).find(d => d.id === conn.to);
+                    if (device1 && device2) {
+                        const device1Name = device1.name || device1.ip;
+                        const device2Name = device2.name || device2.ip;
+                        
+                        // 显示接口连接信息
+                        if (conn.fromInterface && conn.toInterface) {
+                            text += `${device1Name}[${conn.fromInterface}] <-> ${device2Name}[${conn.toInterface}]\n`;
+                        } else {
+                            text += `${device1Name} <-> ${device2Name}\n`;
+                        }
+                        
+                        // 显示连接类型和状态
+                        if (conn.type) text += `  连接类型: ${conn.type}\n`;
+                        if (conn.status) text += `  连接状态: ${conn.status}\n`;
+                        if (conn.bandwidth) text += `  带宽: ${conn.bandwidth}\n`;
+                        text += `\n`;
+                    }
+                });
+            }
+            
+            // 添加网络统计信息
+            text += '\n网络统计:\n';
+            const devices = topologyData.devices || [];
+            const connections = topologyData.connections || [];
+            text += `总设备数: ${devices.length}\n`;
+            text += `在线设备: ${devices.filter(d => d.status === 'online').length}\n`;
+            text += `离线设备: ${devices.filter(d => d.status === 'offline').length}\n`;
+            text += `总连接数: ${connections.length}\n`;
+            
+            // 添加本机网络信息
+            if (localDeviceInfo) {
+                text += `\n本机网络信息:\n`;
+                text += `主机名: ${localDeviceInfo.hostname}\n`;
+                text += `IP地址: ${localDeviceInfo.ip}\n`;
+                text += `MAC地址: ${localDeviceInfo.mac}\n`;
+                text += `默认网关: ${localDeviceInfo.gateway}\n`;
+                text += `操作系统: ${localDeviceInfo.system}\n`;
+            }
+            
+            return text;
+        }
+        
+        // 辅助函数
+        function updateDeviceList() {
+            const deviceList = document.getElementById('deviceList');
+            
+            if (!topologyData.devices || topologyData.devices.length === 0) {
+                deviceList.innerHTML = '<div class="text-muted text-center py-3"><i class="fas fa-search me-2"></i>暂无设备，请开始扫描</div>';
+                return;
+            }
+            
+            deviceList.innerHTML = (topologyData.devices || []).map(device => `
+                <div class="device-item" onclick="selectDevice('${device.id}')">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="fw-bold">${device.name || device.ip}</div>
+                            <small class="text-muted">${device.device_type || 'Unknown'}</small>
+                        </div>
+                        <span class="status-indicator status-${device.status}"></span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function updateTopologyInfo() {
+            if (!topologyData) {
+                topologyData = { devices: [], connections: [] };
+            }
+            
+            const devices = topologyData.devices || [];
+            const connections = topologyData.connections || [];
+            
+            document.getElementById('totalDevices').textContent = devices.length;
+            document.getElementById('onlineDevices').textContent = devices.filter(d => d.status === 'online').length;
+            document.getElementById('totalConnections').textContent = connections.length;
+        }
+        
+        function updateTopologyStatus(status) {
+            document.getElementById('topologyStatus').textContent = status;
+        }
+        
+        function selectDevice(deviceId) {
+            // 设备选择逻辑
+            console.log('选择设备:', deviceId);
+        }
+        
+        function loadTopologyData() {
+            console.log('开始加载拓扑数据...');
+            fetch('/api/topology/data')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('拓扑数据加载成功:', data);
+                if (data && data.devices) {
+                    // 备份当前数据
+                    const currentData = JSON.parse(JSON.stringify(topologyData));
+                    const newData = validateTopologyData(data);
+                    
+                    // 只有当新数据有效且不为空时才更新
+                    if (newData.devices.length > 0 || topologyData.devices.length === 0) {
+                        topologyData = newData;
+                        console.log('更新拓扑数据，设备数量:', topologyData.devices.length);
+                        // 立即保存到本地存储
+                        saveTopologyDataToLocal();
+                    } else {
+                        console.log('服务器返回空数据，保持当前数据不变');
+                    }
+                } else {
+                    console.warn('服务器返回的数据格式不正确，保持当前数据');
+                    // 不重置数据，保持现有数据
+                }
+                drawTopology();
+                updateDeviceList();
+                updateTopologyInfo();
+                updateLastDataSnapshot();
+            })
+            .catch(error => {
+                console.error('加载拓扑数据失败:', error);
+                // 尝试从本地存储恢复数据
+                const localData = loadTopologyDataFromLocal();
+                if (localData && localData.devices.length > 0) {
+                    // 只有当本地数据有效且当前数据为空时才恢复
+                    if (topologyData.devices.length === 0) {
+                        topologyData = localData;
+                        console.log('从本地存储恢复数据成功');
+                        updateTopologyStatus('从本地存储恢复数据');
+                    } else {
+                        console.log('当前已有数据，跳过本地恢复');
+                        updateTopologyStatus('网络加载失败，使用当前数据');
+                    }
+                } else {
+                    // 只有当前数据为空时才使用默认结构
+                    if (topologyData.devices.length === 0) {
+                        topologyData = { devices: [], connections: [] };
+                    }
+                    updateTopologyStatus('数据加载失败: ' + error.message);
+                }
+                drawTopology();
+                updateDeviceList();
+                updateTopologyInfo();
+            });
+        }
+        
+        function saveTopologyView() {
+            // 使用拓扑存储模块保存数据
+            if (window.topologyStorage && topologyData) {
+                window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
+                console.log('拓扑数据已通过存储模块保存到本地和云端');
+            } else {
+                console.warn('拓扑存储模块未加载或无数据可保存');
+            }
+        }
+        
+        function loadTopologyView() {
+            console.log('尝试从存储模块加载数据...');
+            // 从存储模块加载数据
+            if (window.topologyStorage) {
+                try {
+                    const savedData = window.topologyStorage.loadTopologyData();
+                    console.log('存储模块返回数据:', savedData);
+                    
+                    if (savedData && savedData.data) {
+                        topologyData = savedData.data;
+                        currentMode = savedData.mode || 'auto';
+                        
+                        console.log('从存储加载的设备数量:', topologyData.devices ? topologyData.devices.length : 0);
+                        
+                        // 更新界面
+                        drawTopology();
+                        updateDeviceList();
+                        updateTopologyInfo();
+                        updateTopologyStatus('拓扑数据已从存储加载');
+                        
+                        // 更新模式选择器
+                        const modeInput = document.querySelector(`input[value="${currentMode}"]`);
+                        if (modeInput) {
+                            modeInput.checked = true;
+                            switchMode(currentMode);
+                        }
+                        
+                        console.log('拓扑数据已从存储模块加载');
+                        return true;
+                    } else {
+                        console.log('存储中没有有效的拓扑数据');
+                    }
+                } catch (error) {
+                    console.error('从存储模块加载数据时出错:', error);
+                }
+            } else {
+                console.log('拓扑存储模块未加载');
+            }
+            return false;
+        }
+        
+        function setupCloudSync() {
+            // 监听云端数据加载事件
+            window.addEventListener('topologyCloudDataLoaded', function(event) {
+                const cloudData = event.detail.data;
+                console.log('收到云端数据:', cloudData);
+                
+                if (cloudData && cloudData.data) {
+                    const newData = validateTopologyData(cloudData.data);
+                    console.log('验证后的云端数据:', newData);
+                    
+                    // 检查云端数据时间戳，避免用旧数据覆盖新数据
+                    const cloudTimestamp = new Date(cloudData.timestamp).getTime();
+                    const localTimestamp = topologyData.timestamp ? new Date(topologyData.timestamp).getTime() : 0;
+                    
+                    if (cloudTimestamp > localTimestamp || topologyData.devices.length === 0) {
+                        // 备份当前数据
+                        const currentDataBackup = JSON.parse(JSON.stringify(topologyData));
+                        
+                        // 合并云端数据和本地数据
+                        if (newData.devices.length > 0) {
+                            topologyData = newData;
+                            topologyData.timestamp = cloudData.timestamp;
+                        } else if (topologyData.devices.length === 0) {
+                            // 如果本地也没有数据，使用云端数据结构
+                            topologyData = newData;
+                            topologyData.timestamp = cloudData.timestamp;
+                        }
+                        
+                        currentMode = cloudData.mode || 'auto';
+                        
+                        // 更新界面
+                        drawTopology();
+                        updateDeviceList();
+                        updateTopologyInfo();
+                        updateTopologyStatus('已从云端同步最新拓扑数据');
+                        updateLastDataSnapshot();
+                        
+                        console.log('已从云端同步拓扑数据，设备数量:', topologyData.devices.length);
+                    } else {
+                        console.log('本地数据更新，保持当前本地数据');
+                        updateTopologyStatus('本地数据更新，无需同步');
+                    }
+                } else {
+                    console.log('云端数据格式无效或为空');
+                    updateTopologyStatus('云端数据无效，保持本地数据');
+                }
+            });
+            
+            // 监听云端同步成功事件
+            window.addEventListener('topologyCloudSyncSuccess', function(event) {
+                updateTopologyStatus('拓扑数据已同步到云端');
+                console.log('云端同步成功:', event.detail.timestamp);
+            });
+            
+            // 监听云端同步失败事件
+            window.addEventListener('topologyCloudSyncError', function(event) {
+                updateTopologyStatus('云端同步失败: ' + event.detail.error);
+                console.error('云端同步失败:', event.detail.error);
+                // 同步失败时，确保本地数据不丢失
+                saveTopologyDataToLocal();
+            });
+            
+            // 页面卸载时保存数据
+            window.addEventListener('beforeunload', function() {
+                saveTopologyDataToLocal();
+                if (dataPersistenceTimer) {
+                    clearInterval(dataPersistenceTimer);
+                }
+            });
+            
+            // 页面隐藏时保存数据
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    saveTopologyDataToLocal();
+                }
+            });
+        }
+        
+        // 数据持久化相关函数
+        function startDataPersistence() {
+            // 每15秒检查数据是否有变化，如有变化则保存
+            dataPersistenceTimer = setInterval(function() {
+                if (hasDataChanged()) {
+                    // 验证数据完整性后再保存
+                    if (validateDataIntegrity()) {
+                        saveTopologyDataToLocal();
+                        updateLastDataSnapshot();
+                        console.log('数据已自动保存到本地存储');
+                    } else {
+                        console.warn('数据完整性检查失败，跳过自动保存');
+                    }
+                }
+            }, 15000); // 缩短到15秒
+            
+            // 每5分钟强制备份一次
+            setInterval(function() {
+                if (topologyData && topologyData.devices && topologyData.devices.length > 0) {
+                    createDataBackup();
+                }
+            }, 300000); // 5分钟
+        }
+        
+        function hasDataChanged() {
+            const currentSnapshot = JSON.stringify(topologyData);
+            return currentSnapshot !== lastDataSnapshot;
+        }
+        
+        function updateLastDataSnapshot() {
+            lastDataSnapshot = JSON.stringify(topologyData);
+        }
+        
+        // 验证数据完整性
+        function validateDataIntegrity() {
+            try {
+                if (!topologyData || typeof topologyData !== 'object') {
+                    return false;
+                }
+                
+                if (!Array.isArray(topologyData.devices) || !Array.isArray(topologyData.connections)) {
+                    return false;
+                }
+                
+                // 检查设备数据的基本字段
+                for (const device of topologyData.devices) {
+                    if (!device.id && !device.ip) {
+                        console.warn('发现无效设备数据:', device);
+                        return false;
+                    }
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('数据完整性检查出错:', error);
+                return false;
+            }
+        }
+        
+        // 创建数据备份
+        function createDataBackup() {
+            try {
+                const backupKey = 'topology_backup_' + Date.now();
+                const backupData = {
+                    timestamp: new Date().toISOString(),
+                    mode: currentMode,
+                    data: JSON.parse(JSON.stringify(topologyData)),
+                    version: '1.2'
+                };
+                
+                localStorage.setItem(backupKey, JSON.stringify(backupData));
+                
+                // 清理旧备份，只保留最近5个
+                cleanupOldBackups();
+                
+                console.log('数据备份已创建:', backupKey);
+                return true;
+            } catch (error) {
+                console.error('创建数据备份失败:', error);
+                return false;
+            }
+        }
+        
+        // 清理旧备份
+        function cleanupOldBackups() {
+            try {
+                const backupKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('topology_backup_')) {
+                        backupKeys.push(key);
+                    }
+                }
+                
+                // 按时间戳排序，删除旧的备份
+                backupKeys.sort().reverse();
+                while (backupKeys.length > 5) {
+                    const oldKey = backupKeys.pop();
+                    localStorage.removeItem(oldKey);
+                    console.log('已删除旧备份:', oldKey);
+                }
+            } catch (error) {
+                console.error('清理备份失败:', error);
+            }
+        }
+        
+        // 从备份恢复数据
+        function restoreFromBackup() {
+            try {
+                const backupKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('topology_backup_')) {
+                        backupKeys.push(key);
+                    }
+                }
+                
+                if (backupKeys.length === 0) {
+                    console.log('没有找到备份数据');
+                    return false;
+                }
+                
+                // 使用最新的备份
+                backupKeys.sort().reverse();
+                const latestBackupKey = backupKeys[0];
+                const backupData = JSON.parse(localStorage.getItem(latestBackupKey));
+                
+                if (backupData && backupData.data) {
+                    topologyData = validateTopologyData(backupData.data);
+                    currentMode = backupData.mode || 'auto';
+                    
+                    drawTopology();
+                    updateDeviceList();
+                    updateTopologyInfo();
+                    updateTopologyStatus('已从备份恢复数据');
+                    
+                    console.log('已从备份恢复数据:', latestBackupKey);
+                    return true;
+                }
+            } catch (error) {
+                console.error('从备份恢复数据失败:', error);
+            }
+            return false;
+        }
+        
+        function saveTopologyDataToLocal() {
+            try {
+                // 保存前验证数据完整性
+                if (!validateDataIntegrity()) {
+                    console.warn('数据完整性检查失败，跳过保存');
+                    return false;
+                }
+                
+                const dataToSave = {
+                    timestamp: new Date().toISOString(),
+                    mode: currentMode,
+                    data: topologyData,
+                    version: '1.2'
+                };
+                localStorage.setItem('topology_backup', JSON.stringify(dataToSave));
+                
+                // 同时创建备份
+                createDataBackup();
+                
+                console.log('拓扑数据已保存到本地存储');
+                return true;
+            } catch (error) {
+                console.error('保存数据到本地存储失败:', error);
+                return false;
+            }
+        }
+        
+        function loadTopologyDataFromLocal() {
+            try {
+                const savedData = localStorage.getItem('topology_backup');
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    return validateTopologyData(parsedData.data);
+                }
+            } catch (error) {
+                console.error('从本地存储加载数据失败:', error);
+            }
+            return null;
+        }
+        
+        function validateTopologyData(data) {
+            if (!data || typeof data !== 'object') {
+                return { devices: [], connections: [] };
+            }
+            
+            return {
+                devices: Array.isArray(data.devices) ? data.devices : [],
+                connections: Array.isArray(data.connections) ? data.connections : []
+            };
+        }
+        
+        // 合并拓扑数据，避免丢失现有设备
+        function mergeTopologyData(currentData, newData) {
+            if (!currentData || !newData) {
+                return newData || currentData || { devices: [], connections: [] };
+            }
+            
+            const mergedDevices = [...(currentData.devices || [])];
+            const mergedConnections = [...(currentData.connections || [])];
+            
+            // 合并设备，避免重复
+            (newData.devices || []).forEach(newDevice => {
+                const existingIndex = mergedDevices.findIndex(d => 
+                    d.ip === newDevice.ip || 
+                    (d.id && d.id === newDevice.id)
+                );
+                
+                if (existingIndex >= 0) {
+                    // 更新现有设备信息，但保持位置和用户自定义属性
+                    const existing = mergedDevices[existingIndex];
+                    mergedDevices[existingIndex] = {
+                        ...newDevice,
+                        x: existing.x || newDevice.x,
+                        y: existing.y || newDevice.y,
+                        isLocal: existing.isLocal || newDevice.isLocal,
+                        userDefined: existing.userDefined || newDevice.userDefined
+                    };
+                } else {
+                    // 添加新设备
+                    mergedDevices.push(newDevice);
+                }
+            });
+            
+            // 合并连接，避免重复
+            (newData.connections || []).forEach(newConn => {
+                const exists = mergedConnections.some(c => 
+                    (c.source === newConn.source && c.target === newConn.target) ||
+                    (c.source === newConn.target && c.target === newConn.source)
+                );
+                
+                if (!exists) {
+                    mergedConnections.push(newConn);
+                }
+            });
+            
+            return {
+                devices: mergedDevices,
+                connections: mergedConnections
+            };
+        }
+        
+        // 页面初始化逻辑已合并到 initializeTopologyPage 函数中
+        
+        // 登出功能
+        async function logout() {
+            try {
+                // 调用后端登出API
+                await fetch('/auth/logout', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            } finally {
+                // 无论API调用是否成功，都清除本地存储并跳转
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user_info');
+                window.location.href = '/login';
+            }
+        }
+        
+        // 页面加载时检查认证状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user_info');
+            
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    document.getElementById('currentUsername').textContent = userData.username || '用户';
+                    document.getElementById('userSection').style.display = 'block';
+                    document.getElementById('authSection').style.display = 'none';
+                } catch (error) {
+                    console.error('解析用户数据失败:', error);
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user_info');
+                    window.location.href = '/login';
+                }
+            } else {
+                window.location.href = '/login';
+            }
+        });
+    </script>
+</body>
+</html>

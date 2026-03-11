@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户设置 - AI网络管理系统</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/vendor/font-awesome/all.min.css">
+    <link rel="stylesheet" href="/static/vendor/bootstrap-icons/bootstrap-icons-1.7.2.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/config.css') }}">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3 me-2"></i>
+                AI网络工程系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/chat">AI聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/topology">网络拓扑</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/develop">开发页面</a>
+                    </li>
+                </ul>
+                
+                <!-- 用户信息 -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown" id="userSection" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="/api/settings"><i class="fas fa-cog me-2"></i>用户设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-item" id="authSection">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- 左侧导航 -->
+            <div class="col-md-3 col-lg-2 sidebar">
+                <div class="sidebar-sticky">
+                    <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted">
+                        <span>设置选项</span>
+                    </h6>
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="profile">
+                                <i class="fas fa-user me-2"></i>
+                                个人资料
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="account">
+                                <i class="fas fa-key me-2"></i>
+                                账户安全
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" data-section="preferences">
+                                <i class="fas fa-palette me-2"></i>
+                                偏好设置
+                            </a>
+                        </li>
+                        <li class="nav-item" id="systemConfigNav" style="display: none;">
+                            <a class="nav-link" href="#" data-section="system">
+                                <i class="fas fa-cogs me-2"></i>
+                                系统配置
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 主内容区域 -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2" id="pageTitle">个人资料</h1>
+                </div>
+
+                <!-- 个人资料设置 -->
+                <div id="profileSection" class="settings-section">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">个人信息</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="profileForm">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="username" class="form-label">用户名</label>
+                                            <input type="text" class="form-control" id="username" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="email" class="form-label">邮箱地址</label>
+                                            <input type="email" class="form-control" id="email">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="createdAt" class="form-label">注册时间</label>
+                                            <input type="text" class="form-control" id="createdAt" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="lastLogin" class="form-label">最后登录</label>
+                                            <input type="text" class="form-control" id="lastLogin" readonly>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>保存更改
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 账户安全设置 -->
+                <div id="accountSection" class="settings-section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">密码修改</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="passwordForm">
+                                <div class="mb-3">
+                                    <label for="currentPassword" class="form-label">当前密码</label>
+                                    <input type="password" class="form-control" id="currentPassword" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="newPassword" class="form-label">新密码</label>
+                                    <input type="password" class="form-control" id="newPassword" required>
+                                    <div class="form-text">密码长度至少8位，包含字母和数字</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="confirmPassword" class="form-label">确认新密码</label>
+                                    <input type="password" class="form-control" id="confirmPassword" required>
+                                </div>
+                                <button type="submit" class="btn btn-warning">
+                                    <i class="fas fa-key me-2"></i>修改密码
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 偏好设置 -->
+                <div id="preferencesSection" class="settings-section" style="display: none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">界面偏好</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="preferencesForm">
+                                <div class="mb-3">
+                                    <label class="form-label">主题设置</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="theme" id="lightTheme" value="light" checked>
+                                        <label class="form-check-label" for="lightTheme">
+                                            <i class="fas fa-sun me-2"></i>浅色主题
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="theme" id="darkTheme" value="dark">
+                                        <label class="form-check-label" for="darkTheme">
+                                            <i class="fas fa-moon me-2"></i>深色主题
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="theme" id="autoTheme" value="auto">
+                                        <label class="form-check-label" for="autoTheme">
+                                            <i class="fas fa-adjust me-2"></i>跟随系统
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="language" class="form-label">语言设置</label>
+                                    <select class="form-select" id="language">
+                                        <option value="zh-CN" selected>简体中文</option>
+                                        <option value="en-US">English</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="notifications" checked>
+                                        <label class="form-check-label" for="notifications">
+                                            启用通知
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>保存偏好
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统配置 (仅管理员可见) -->
+                <div id="systemSection" class="settings-section" style="display: none;">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">系统配置</h5>
+                            <small class="text-muted">仅管理员可访问</small>
+                        </div>
+                        <div class="card-body">
+                            <div id="systemConfigContainer">
+                                <!-- 系统配置表单将通过AJAX动态加载 -->
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">加载中...</span>
+                                    </div>
+                                    <p class="mt-2">正在加载系统配置...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 模型配置已移除 -->
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="messageToast" class="toast" role="alert">
+            <div class="toast-header">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong class="me-auto">提示</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toastMessage">
+                <!-- 消息内容 -->
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-5.1.3.bundle.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/config.js') }}"></script>
+    <script>
+        // 登出功能
+        async function logout() {
+            try {
+                // 调用后端登出API
+                await fetch('/auth/logout', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+            } catch (error) {
+                console.error('登出请求失败:', error);
+            } finally {
+                // 无论API调用是否成功，都清除本地存储并跳转
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user_info');
+                window.location.href = '/login';
+            }
+        }
+        
+        // 页面加载时检查认证状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user_info');
+            
+            if (token && user) {
+                try {
+                    const userData = JSON.parse(user);
+                    document.getElementById('currentUsername').textContent = userData.username || '用户';
+                    document.getElementById('userSection').style.display = 'block';
+                    document.getElementById('authSection').style.display = 'none';
+                } catch (error) {
+                    console.error('解析用户数据失败:', error);
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user_info');
+                    window.location.href = '/login';
+                }
+            } else {
+                window.location.href = '/login';
+            }
+        });
+    </script>
+</body>
+</html>

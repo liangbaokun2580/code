@@ -1,0 +1,196 @@
+/* 自定义工具页面样式 */
+
+/* 工具列表样式 */
+#toolsList {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.tool-item {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.tool-item:hover {
+    background-color: #f8f9fa;
+}
+
+.tool-item.active {
+    background-color: #e9ecef;
+    border-left: 3px solid #0d6efd;
+}
+
+.tool-item .tool-name {
+    font-weight: 500;
+}
+
+.tool-item .tool-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 代码编辑器样式 */
+.code-editor {
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    height: 500px;
+}
+
+.CodeMirror {
+    height: 100%;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+}
+
+/* 工具元数据表单样式 */
+.tool-metadata {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 15px;
+}
+
+/* 工具输出区域样式 */
+.tool-output {
+    background-color: #212529;
+    color: #f8f9fa;
+    font-family: 'Courier New', monospace;
+    padding: 15px;
+    min-height: 200px;
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 0;
+    border-radius: 0 0 0.25rem 0.25rem;
+}
+
+/* 参数表单样式 */
+#parametersForm {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 15px;
+}
+
+.parameter-item {
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.parameter-item:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.parameter-description {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+/* 文档样式 */
+#docs pre {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 15px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    overflow-x: auto;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .code-editor {
+        height: 300px;
+    }
+    
+    #toolsList {
+        max-height: 300px;
+    }
+    
+    .tool-output {
+        max-height: 200px;
+    }
+}
+
+/* 工具运行状态指示器 */
+.tool-status {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.tool-status.success {
+    background-color: #28a745;
+}
+
+.tool-status.error {
+    background-color: #dc3545;
+}
+
+.tool-status.running {
+    background-color: #ffc107;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
+/* 工具输出中的不同类型消息样式 */
+.output-info {
+    color: #17a2b8;
+}
+
+.output-success {
+    color: #28a745;
+}
+
+.output-warning {
+    color: #ffc107;
+}
+
+.output-error {
+    color: #dc3545;
+}
+
+.output-debug {
+    color: #6c757d;
+}
+
+/* 工具分类标签样式 */
+.tool-category {
+    display: inline-block;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    margin-left: 0.5rem;
+}
+
+.tool-category.network {
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+.tool-category.system {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.tool-category.security {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.tool-category.other {
+    background-color: #e2e3e5;
+    color: #41464b;
+}

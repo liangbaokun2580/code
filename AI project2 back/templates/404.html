@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面未找到 - AI网络管理系统</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .error-container {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .error-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 3rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+        }
+        .error-code {
+            font-size: 6rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .error-message {
+            font-size: 1.5rem;
+            color: #333;
+            margin-bottom: 2rem;
+        }
+        .error-description {
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        .btn-home {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            color: white;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn-home:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-card">
+            <div class="error-code">404</div>
+            <div class="error-message">页面未找到</div>
+            <div class="error-description">
+                抱歉，您访问的页面不存在或已被移动。<br>
+                请检查URL是否正确，或返回首页继续浏览。
+            </div>
+            <a href="{{ url_for('index') }}" class="btn btn-home">
+                <i class="fas fa-home me-2"></i>返回首页
+            </a>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-5.1.3.bundle.min.js') }}"></script>
+<!-- FontAwesome kit removed - using local font-awesome instead -->
+</body>
+</html>

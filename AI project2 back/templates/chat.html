@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI聊天 - AI网络工程系统</title>
+    <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <link href="/static/css/chat.css" rel="stylesheet">
+    <link href="/static/vendor/highlight.js/github.min.css" rel="stylesheet">
+    <style>
+        /* Function Call 确认模态框样式 */
+        #functionCallConfirmModal .modal-header {
+            border-bottom: 2px solid #ffc107;
+        }
+        
+        #functionCallConfirmModal .function-call-details .card {
+            border: 1px solid #dee2e6;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        #functionCallConfirmModal .risk-level {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #functionCallConfirmModal #functionParameters {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        #functionCallConfirmModal .form-check-label {
+            font-weight: 500;
+            cursor: pointer;
+        }
+        
+        #functionCallConfirmModal .modal-footer {
+            border-top: 2px solid #dee2e6;
+            padding: 1rem 1.5rem;
+        }
+        
+        #functionCallConfirmModal .btn {
+            min-width: 120px;
+        }
+        
+        /* 风险等级样式 */
+        .alert-success .risk-level {
+            color: #155724;
+        }
+        
+        .alert-warning .risk-level {
+            color: #856404;
+        }
+        
+        .alert-danger .risk-level {
+            color: #721c24;
+        }
+        
+        /* 参数显示区域样式 */
+        #functionParameters {
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            background-color: #f8f9fa;
+        }
+        
+        /* 确认复选框样式 */
+        #confirmUnderstand {
+            transform: scale(1.2);
+            margin-right: 8px;
+        }
+        
+        /* 参数选择界面样式 */
+        .parameter-selection {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 100%;
+        }
+        
+        .parameter-selection .form-label {
+            color: #495057;
+            margin-bottom: 0.25rem;
+            font-size: 0.85rem;
+        }
+        
+        .parameter-options {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 0.25rem;
+            padding: 0.375rem;
+            margin-bottom: 0.375rem;
+        }
+        
+        .parameter-options .form-check {
+            margin-bottom: 0.125rem;
+        }
+        
+        .parameter-options .form-check:last-child {
+            margin-bottom: 0;
+        }
+        
+        .parameter-options .form-check-input {
+            width: 0.75rem;
+            height: 0.75rem;
+            margin-top: 0.0625rem;
+            margin-right: 0.375rem;
+        }
+        
+        .parameter-options .form-check-input:checked {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        
+        .parameter-options .form-check-label {
+            font-weight: 400;
+            color: #495057;
+            cursor: pointer;
+            padding-left: 0;
+            font-size: 0.8rem;
+            line-height: 1.1;
+        }
+        
+        .parameter-options .form-check-input:checked + .form-check-label {
+            color: #0d6efd;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-diagram-3 me-2"></i>
+                AI网络工程系统
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/chat">AI聊天</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/topology">网络拓扑</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/develop">开发页面</a>
+                    </li>
+                </ul>
+                
+                <!-- 用户信息 -->
+                <div class="navbar-nav ms-auto">
+                    <div class="nav-item dropdown" id="userSection" style="display: none;">
+                        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user-circle me-1"></i>
+                            <span id="currentUsername">用户</span>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="/profile">
+                                <i class="fas fa-user me-2"></i>个人资料
+                            </a></li>
+                            <li><a class="dropdown-item" href="/api/settings"><i class="fas fa-cog me-2"></i>用户设置</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="logout()">
+                                <i class="fas fa-sign-out-alt me-2"></i>退出登录
+                            </a></li>
+                        </ul>
+                    </div>
+                    <div class="nav-item" id="authSection">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>登录
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid h-100">
+        <div class="row h-100">
+            <!-- 侧边栏 -->
+            <div class="col-md-3 sidebar">
+                <div class="sidebar-header">
+                    <h5><i class="bi bi-robot me-2"></i>AI助手</h5>
+                </div>
+                
+                <!-- 模式切换 -->
+                <div class="mode-selector mb-3">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="mode" id="chatMode" value="chat" checked>
+                        <label class="btn btn-outline-primary" for="chatMode">
+                            <i class="bi bi-chat-dots me-1"></i>聊天模式
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="mode" id="buildMode" value="build">
+                        <label class="btn btn-outline-success" for="buildMode">
+                            <i class="bi bi-gear me-1"></i>构建模式
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 模式说明 -->
+                <div class="mode-description">
+                    <div id="chatModeDesc" class="mode-desc active">
+                        <h6><i class="bi bi-info-circle me-2"></i>聊天模式</h6>
+                        <p class="small text-muted">在此模式下，您可以：</p>
+                        <ul class="small text-muted">
+                            <li>查看网络设备状态</li>
+                            <li>分析网络配置</li>
+                            <li>获取故障排除建议</li>
+                            <li>询问网络相关问题</li>
+                        </ul>
+                    </div>
+                    <div id="buildModeDesc" class="mode-desc">
+                        <h6><i class="bi bi-info-circle me-2"></i>构建模式</h6>
+                        <p class="small text-muted">在此模式下，您可以：</p>
+                        <ul class="small text-muted">
+                            <li>修改网络设备配置</li>
+                            <li>添加或删除设备</li>
+                            <li>更新网络拓扑</li>
+                            <li>执行配置命令</li>
+                        </ul>
+                        <div class="alert alert-warning alert-sm">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <small>构建模式可以修改配置，请谨慎操作</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 网络状态概览 -->
+                <div class="network-overview">
+                    <h6><i class="bi bi-bar-chart me-2"></i>网络概览</h6>
+                    <div id="networkSummary" class="status-summary">
+                        <div class="status-item">
+                            <span class="status-label">总设备:</span>
+                            <span class="status-value" id="sidebarTotalDevices">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">在线:</span>
+                            <span class="status-value text-success" id="sidebarOnlineDevices">-</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">离线:</span>
+                            <span class="status-value text-warning" id="sidebarOfflineDevices">-</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 设备列表 -->
+                <div class="device-overview">
+                    <h6><i class="bi bi-diagram-3 me-2"></i>设备列表</h6>
+                    <div id="sidebarDeviceList" class="sidebar-device-list">
+                        <div class="text-muted text-center py-2">
+                            <i class="bi bi-arrow-clockwise me-1"></i>
+                            <small>加载中...</small>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <a href="/topology" class="btn btn-sm btn-outline-primary w-100">
+                            <i class="bi bi-diagram-2 me-1"></i>查看拓扑
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 安全设置 -->
+                <div class="security-settings mb-3">
+                    <h6><i class="bi bi-shield-check me-2"></i>安全设置</h6>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="requireFunctionConfirm" checked>
+                        <label class="form-check-label small" for="requireFunctionConfirm">
+                            Function Call 确认
+                        </label>
+                    </div>
+                    <small class="text-muted">启用后，每个AI工具调用都需要您的确认</small>
+                </div>
+                
+                <!-- 模型选择 -->
+                <div class="model-selection mb-3">
+                    <h6><i class="bi bi-cpu me-2"></i>模型选择</h6>
+                    <select class="form-select form-select-sm" id="modelSelect">
+                        <option value="" disabled selected>加载中...</option>
+                    </select>
+                    <small class="text-muted mt-1 d-block">选择不同的模型可能会影响响应质量和速度</small>
+                </div>
+                
+                <!-- 会话管理 -->
+                <div class="session-management mb-3">
+                    <h6><i class="bi bi-chat-square-text me-2"></i>会话管理</h6>
+                    <div class="d-grid gap-2 mb-2">
+                        <button class="btn btn-sm btn-success" onclick="createNewSession()">
+                            <i class="bi bi-plus-circle me-1"></i>新建会话
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="showSessionList()">
+                            <i class="bi bi-list me-1"></i>会话列表
+                        </button>
+                    </div>
+                    
+                    <!-- 当前会话信息 -->
+                    <div class="current-session-info">
+                        <div class="card card-body p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">当前会话</small>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteCurrentSession()" title="删除当前会话">
+                                    <i class="bi bi-trash3"></i>
+                                </button>
+                            </div>
+                            <div class="session-id-display">
+                                <small class="font-monospace text-primary" id="currentSessionDisplay">加载中...</small>
+                            </div>
+                            <div class="session-stats mt-1">
+                                <small class="text-muted">
+                                    消息数: <span id="messageCount">0</span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 快速操作 -->
+                <div class="quick-actions">
+                    <h6><i class="bi bi-lightning me-2"></i>快速操作</h6>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-sm btn-outline-primary" onclick="sendQuickMessage('查看网络状态')">
+                            <i class="bi bi-eye me-1"></i>查看状态
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="sendQuickMessage('测试网络连通性')">
+                            <i class="bi bi-wifi me-1"></i>测试连通性
+                        </button>
+                        <div class="btn-group w-100" role="group">
+                            <button class="btn btn-sm btn-outline-success" onclick="saveChatHistory()">
+                                <i class="bi bi-download me-1"></i>本地保存
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="saveChatToCloud()">
+                                <i class="bi bi-cloud-upload me-1"></i>云端保存
+                            </button>
+                        </div>
+                        <div class="btn-group w-100 mt-1" role="group">
+                            <button class="btn btn-sm btn-outline-warning" onclick="loadChatHistory()">
+                                <i class="bi bi-upload me-1"></i>本地加载
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadChatFromCloud()">
+                                <i class="bi bi-cloud-download me-1"></i>云端加载
+                            </button>
+                        </div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearChat()">
+                            <i class="bi bi-trash me-1"></i>清空聊天
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 聊天区域 -->
+            <div class="col-md-9 chat-area">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <h5 class="mb-0">
+                            <span id="currentModeIcon" class="bi bi-chat-dots me-2"></span>
+                            <span id="currentModeText">聊天模式</span>
+                        </h5>
+                        <div class="chat-status">
+                            <span class="badge bg-success" id="connectionStatus">已连接</span>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message assistant">
+                            <div class="message-avatar">
+                                <i class="bi bi-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？
+                                </div>
+                                <div class="message-time">刚刚</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-input">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="messageInput" placeholder="输入您的消息..." maxlength="1000">
+                            <button class="btn btn-primary" type="button" id="sendButton">
+                                <i class="bi bi-send"></i>
+                            </button>
+                        </div>
+                        <div class="input-footer">
+                            <small class="text-muted">按 Enter 发送消息，Shift+Enter 换行</small>
+                            <span class="char-count">
+                                <span id="charCount">0</span>/1000
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工具执行模态框 -->
+    <div class="modal fade" id="toolExecutionModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-arrow-clockwise me-2"></i>
+                        执行工具调用
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="tool-execution-info">
+                        <p>AI正在调用工具: <strong id="currentToolName"></strong></p>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载对话模态框 -->
+    <div class="modal fade" id="loadChatModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-upload me-2"></i>
+                        加载对话历史
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="chatFileInput" class="form-label">选择对话文件</label>
+                        <input type="file" class="form-control" id="chatFileInput" accept=".json,.txt">
+                        <div class="form-text">支持JSON和TXT格式的对话文件</div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        加载对话将替换当前的聊天内容，请确保已保存重要对话。
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="loadChatFromFile()">加载对话</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 会话列表模态框 -->
+    <div class="modal fade" id="sessionListModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-chat-square-text me-2"></i>
+                        会话管理
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">我的会话</h6>
+                        <button class="btn btn-sm btn-success" onclick="createNewSessionFromModal()">
+                            <i class="bi bi-plus-circle me-1"></i>新建会话
+                        </button>
+                    </div>
+                    
+                    <div id="sessionListContainer">
+                        <div class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                            <p class="mt-2 text-muted">正在加载会话列表...</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    <button type="button" class="btn btn-danger" onclick="clearAllSessions()">
+                        <i class="bi bi-trash me-1"></i>清空所有会话
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Function Call 确认模态框 -->
+    <div class="modal fade" id="functionCallConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Function Call 执行确认
+                    </h5>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-shield-exclamation me-2"></i>
+                        <strong>安全提示：</strong>AI 正在请求执行以下操作，请仔细检查后决定是否允许执行。
+                    </div>
+                    
+                    <div class="function-call-details">
+                        <h6><i class="bi bi-gear me-2"></i>Function 详情</h6>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row mb-2">
+                                    <div class="col-sm-3"><strong>Function 名称:</strong></div>
+                                    <div class="col-sm-9">
+                                        <span class="badge bg-primary" id="functionName">-</span>
+                                    </div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-sm-3"><strong>描述:</strong></div>
+                                    <div class="col-sm-9" id="functionDescription">-</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-sm-3"><strong>参数:</strong></div>
+                                    <div class="col-sm-9">
+                                        <pre class="bg-light p-2 rounded" id="functionParameters" style="max-height: 200px; overflow-y: auto;">-</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <h6><i class="bi bi-info-circle me-2"></i>风险评估</h6>
+                        <div id="riskAssessment" class="alert alert-info">
+                            <div class="risk-level">
+                                <span class="badge" id="riskBadge">评估中...</span>
+                                <span id="riskDescription">正在分析操作风险...</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-check mt-3">
+                        <input class="form-check-input" type="checkbox" id="confirmUnderstand">
+                        <label class="form-check-label" for="confirmUnderstand">
+                            我已仔细阅读上述信息，理解此操作的风险，并同意执行
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="denyFunctionCall">
+                        <i class="bi bi-x-circle me-1"></i>拒绝执行
+                    </button>
+                    <button type="button" class="btn btn-success" id="approveFunctionCall" disabled>
+                        <i class="bi bi-check-circle me-1"></i>批准执行
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-5.1.3.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/marked-4.3.0.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/highlight-11.7.0.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/python.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/bash.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/javascript.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/xml.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/highlight.js/css.min.js') }}"></script>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/topology-storage.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script>
+        // 用户认证检查
+        function checkAuthentication() {
+            if (!ApiClient.isAuthenticated()) {
+                window.location.href = '/login';
+                return false;
+            }
+            
+            // 显示用户信息
+            const userInfo = localStorage.getItem('user_info');
+            if (userInfo) {
+                const user = JSON.parse(userInfo);
+                document.getElementById('currentUsername').textContent = user.username || '用户';
+            }
+            
+            return true;
+        }
+        
+        // 登出功能
+        async function logout() {
+            if (confirm('确定要登出吗？')) {
+                try {
+                    // 调用后端登出API
+                    await fetch('/auth/logout', {
+                        method: 'GET',
+                        credentials: 'include'
+                    });
+                } catch (error) {
+                    console.error('登出请求失败:', error);
+                } finally {
+                    // 无论API调用是否成功，都清除本地存储并跳转
+                    ApiClient.removeAuthToken();
+                    localStorage.removeItem('user_info');
+                    localStorage.removeItem('chat_session_id');
+                    
+                    // 跳转到登录页面
+                    window.location.href = '/login?message=' + encodeURIComponent('已成功登出') + '&type=success';
+                }
+            }
+        }
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', async function() {
+            // 检查认证并显示用户信息
+            if (!checkAuthentication()) {
+                return;
+            }
+            
+            // 显示用户区域
+            const userSection = document.getElementById('userSection');
+            const authSection = document.getElementById('authSection');
+            if (userSection && authSection) {
+                userSection.style.display = 'block';
+                authSection.style.display = 'none';
+            }
+            
+            // 初始化拓扑存储模块
+            if (window.topologyStorage) {
+                // 设置云端同步
+                setupCloudSync();
+                
+                // 尝试从存储加载数据
+                try {
+                    const dataLoaded = loadTopologyView();
+                    console.log('从存储加载数据结果:', dataLoaded);
+                    
+                    // 如果没有存储的数据，则从服务器加载
+                    if (!dataLoaded) {
+                        console.log('未找到存储数据，从服务器加载');
+                        loadTopologyData();
+                    }
+                } catch (error) {
+                    console.error('从存储加载数据失败:', error);
+                    // 如果存储加载失败，直接从服务器加载
+                    loadTopologyData();
+                }
+            }
+            
+            window.chatManager = new ChatManager();
+            
+            // 尝试从云端加载聊天历史
+            const cloudDataLoaded = await window.chatManager.initializeChatFromCloud();
+            
+            loadNetworkStatus();
+            
+            // 每3分钟更新一次网络状态
+            setInterval(() => {
+                loadNetworkStatus();
+            }, 180000);
+            
+            console.log('聊天页面初始化完成');
+        });
+        
+        // 设置云端同步（与topology.html保持一致）
+        function setupCloudSync() {
+            // 监听云端数据加载事件
+            window.addEventListener('topologyCloudDataLoaded', function(event) {
+                const cloudData = event.detail.data;
+                if (cloudData && cloudData.data) {
+                    console.log('云端拓扑数据已加载到聊天页面');
+                    // 通知ChatManager更新设备列表
+                    if (window.chatManager) {
+                        window.chatManager.loadSidebarDeviceList();
+                    }
+                }
+            });
+            
+            // 监听云端同步成功事件
+            window.addEventListener('topologyCloudSyncSuccess', function(event) {
+                console.log('拓扑数据云端同步成功');
+            });
+            
+            // 监听云端同步错误事件
+            window.addEventListener('topologyCloudSyncError', function(event) {
+                console.error('拓扑数据云端同步失败:', event.detail.error);
+            });
+        }
+        
+        // 从存储模块加载数据（与topology.html保持一致）
+        function loadTopologyView() {
+            console.log('尝试从存储模块加载数据...');
+            // 从存储模块加载数据
+            if (window.topologyStorage) {
+                try {
+                    const savedData = window.topologyStorage.loadTopologyData();
+                    console.log('存储模块返回数据:', savedData);
+                    
+                    if (savedData && savedData.data) {
+                        console.log('从存储加载的设备数量:', savedData.data.devices ? savedData.data.devices.length : 0);
+                        console.log('拓扑数据已从存储模块加载到聊天页面');
+                        return true;
+                    } else {
+                        console.log('存储中没有有效的拓扑数据');
+                    }
+                } catch (error) {
+                    console.error('从存储模块加载数据时出错:', error);
+                }
+            } else {
+                console.log('拓扑存储模块未加载');
+            }
+            return false;
+        }
+        
+        // 完全从本地存储加载拓扑数据
+        function loadTopologyData() {
+            console.log('从本地存储加载拓扑数据...');
+            const localData = loadTopologyDataFromLocal();
+            if (localData) {
+                console.log('从本地存储加载数据成功:', localData);
+                // 通知ChatManager更新设备列表
+                if (window.chatManager) {
+                    window.chatManager.loadSidebarDeviceList();
+                }
+            } else {
+                console.log('本地存储中没有拓扑数据');
+                // 如果没有本地数据，创建一个空的数据结构
+                const emptyData = { devices: [], connections: [] };
+                // 通知ChatManager更新设备列表（显示空列表）
+                if (window.chatManager) {
+                    window.chatManager.loadSidebarDeviceList();
+                }
+            }
+        }
+        
+        // 与 topology.html 相同的本地存储函数
+        function loadTopologyDataFromLocal() {
+            try {
+                const savedData = localStorage.getItem('topology_backup');
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+                    return validateTopologyData(parsedData.data);
+                }
+            } catch (error) {
+                console.error('从本地存储加载数据失败:', error);
+            }
+            return null;
+        }
+        
+        function validateTopologyData(data) {
+            if (!data || typeof data !== 'object') {
+                return { devices: [], connections: [] };
+            }
+            
+            return {
+                devices: Array.isArray(data.devices) ? data.devices : [],
+                connections: Array.isArray(data.connections) ? data.connections : []
+            };
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "base_url": "http://192.168.1.107:11434",
+  "default_model": "llama3.1:latest",
+  "temperature": 0.8,
+  "max_tokens": 2048,
+  "timeout": 30,
+  "model_mapping": {
+    "gpt-3.5-turbo": "llama2:latest",
+    "gpt-4": "llama2:13b",
+    "gpt-4-turbo": "llama2:70b",
+    "gpt-4o": "llama3.1"
+  }
+}

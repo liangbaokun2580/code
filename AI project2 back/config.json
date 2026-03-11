@@ -1,0 +1,40 @@
+{
+  "openai": {
+    "api_key": " sk-",
+    "api_base": "http://127.0.0.1:5000",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "max_tokens": 1024,
+    "top_p": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0
+  },
+  "database": {
+    "uri": "sqlite:///ai_network_system.db",
+    "pool_size": 10
+  },
+  "network": {
+    "scan_timeout": 30,
+    "scan_threads": 50,
+    "default_scan_range": "192.168.1.0/24"
+  },
+  "redis": {
+    "url": "redis://localhost:6379/0",
+    "host": "localhost",
+    "port": 6379,
+    "password": ""
+  },
+  "app": {
+    "name": "AI网络管理系统",
+    "version": "1.0.0",
+    "debug_mode": false
+  },
+  "logging": {
+    "level": "INFO"
+  },
+  "local_model": {
+    "use_local": true,
+    "base_url": "http://192.168.1.2:11434",
+    "model_name": "llama2:latest"
+  }
+}

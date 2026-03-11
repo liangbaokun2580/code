@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 - AI网络管理系统</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="/static/vendor/bootstrap/bootstrap-5.3.0.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="/static/vendor/font-awesome/all.min.css" rel="stylesheet">
+    <!-- 自定义样式 -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 0;
+        }
+        
+        .register-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            width: 100%;
+            max-width: 450px;
+        }
+        
+        .register-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .register-header h2 {
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .register-header p {
+            color: #666;
+            margin: 0;
+        }
+        
+        .form-floating {
+            margin-bottom: 1rem;
+        }
+        
+        .form-control {
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-control.is-valid {
+            border-color: #28a745;
+        }
+        
+        .form-control.is-invalid {
+            border-color: #dc3545;
+        }
+        
+        .btn-register {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-register:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .divider {
+            text-align: center;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+        
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #e9ecef;
+        }
+        
+        .divider span {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 0 1rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        .password-strength {
+            margin-top: 0.5rem;
+        }
+        
+        .strength-bar {
+            height: 4px;
+            border-radius: 2px;
+            background: #e9ecef;
+            overflow: hidden;
+        }
+        
+        .strength-fill {
+            height: 100%;
+            transition: all 0.3s ease;
+            width: 0%;
+        }
+        
+        .strength-weak { background: #dc3545; }
+        .strength-medium { background: #ffc107; }
+        .strength-strong { background: #28a745; }
+        
+        .validation-feedback {
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="register-header">
+            <i class="fas fa-user-plus fa-3x text-primary mb-3"></i>
+            <h2>创建账户</h2>
+            <p>注册AI网络管理系统</p>
+        </div>
+        
+        <!-- 错误消息 -->
+        <div id="errorAlert" class="alert alert-danger d-none" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <span id="errorMessage"></span>
+        </div>
+        
+        <!-- 成功消息 -->
+        <div id="successAlert" class="alert alert-success d-none" role="alert">
+            <i class="fas fa-check-circle me-2"></i>
+            <span id="successMessage"></span>
+        </div>
+        
+        <form id="registerForm">
+            <div class="form-floating">
+                <input type="text" class="form-control" id="username" name="username" placeholder="用户名" required>
+                <label for="username">
+                    <i class="fas fa-user me-2"></i>用户名
+                </label>
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <div class="form-floating">
+                <input type="email" class="form-control" id="email" name="email" placeholder="邮箱" required>
+                <label for="email">
+                    <i class="fas fa-envelope me-2"></i>邮箱
+                </label>
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" placeholder="密码" required>
+                <label for="password">
+                    <i class="fas fa-lock me-2"></i>密码
+                </label>
+                <div class="password-strength">
+                    <div class="strength-bar">
+                        <div class="strength-fill" id="strengthFill"></div>
+                    </div>
+                    <small class="text-muted" id="strengthText">密码强度：弱</small>
+                </div>
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <div class="form-floating">
+                <input type="password" class="form-control" id="confirmPassword" name="confirm_password" placeholder="确认密码" required>
+                <label for="confirmPassword">
+                    <i class="fas fa-lock me-2"></i>确认密码
+                </label>
+                <div class="invalid-feedback"></div>
+            </div>
+            
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="agreeTerms" name="agree_terms" required>
+                <label class="form-check-label" for="agreeTerms">
+                    我同意 <a href="#" class="text-primary">服务条款</a> 和 <a href="#" class="text-primary">隐私政策</a>
+                </label>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-register w-100">
+                <i class="fas fa-user-plus me-2"></i>
+                注册
+            </button>
+        </form>
+        
+        <div class="divider">
+            <span>或</span>
+        </div>
+        
+        <div class="login-link">
+            <p>已有账户？ <a href="/login">立即登录</a></p>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap-5.3.0.bundle.min.js') }}"></script>
+    
+    <script>
+        // 表单验证
+        const form = document.getElementById('registerForm');
+        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        
+        // 密码强度检测
+        passwordInput.addEventListener('input', function() {
+            const password = this.value;
+            const strength = calculatePasswordStrength(password);
+            updatePasswordStrength(strength);
+        });
+        
+        // 确认密码验证
+        confirmPasswordInput.addEventListener('input', function() {
+            validatePasswordMatch();
+        });
+        
+        // 用户名验证
+        usernameInput.addEventListener('blur', async function() {
+            await validateUsername();
+        });
+        
+        // 邮箱验证
+        emailInput.addEventListener('blur', async function() {
+            await validateEmail();
+        });
+        
+        // 计算密码强度
+        function calculatePasswordStrength(password) {
+            let score = 0;
+            
+            if (password.length >= 8) score += 1;
+            if (password.length >= 12) score += 1;
+            if (/[a-z]/.test(password)) score += 1;
+            if (/[A-Z]/.test(password)) score += 1;
+            if (/[0-9]/.test(password)) score += 1;
+            if (/[^A-Za-z0-9]/.test(password)) score += 1;
+            
+            return Math.min(score, 3);
+        }
+        
+        // 更新密码强度显示
+        function updatePasswordStrength(strength) {
+            const fill = document.getElementById('strengthFill');
+            const text = document.getElementById('strengthText');
+            
+            const levels = [
+                { width: '33%', class: 'strength-weak', text: '密码强度：弱' },
+                { width: '66%', class: 'strength-medium', text: '密码强度：中' },
+                { width: '100%', class: 'strength-strong', text: '密码强度：强' }
+            ];
+            
+            const level = levels[Math.max(0, strength - 1)] || levels[0];
+            
+            fill.style.width = level.width;
+            fill.className = 'strength-fill ' + level.class;
+            text.textContent = level.text;
+        }
+        
+        // 验证密码匹配
+        function validatePasswordMatch() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+            
+            if (confirmPassword && password !== confirmPassword) {
+                setFieldInvalid(confirmPasswordInput, '密码不匹配');
+                return false;
+            } else if (confirmPassword) {
+                setFieldValid(confirmPasswordInput);
+                return true;
+            }
+            return true;
+        }
+        
+        // 验证用户名
+        async function validateUsername() {
+            const username = usernameInput.value.trim();
+            
+            if (!username) {
+                setFieldInvalid(usernameInput, '请输入用户名');
+                return false;
+            }
+            
+            if (username.length < 3) {
+                setFieldInvalid(usernameInput, '用户名至少3个字符');
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/auth/check-username', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.available) {
+                    setFieldInvalid(usernameInput, '用户名已被使用');
+                    return false;
+                }
+                
+                setFieldValid(usernameInput);
+                return true;
+            } catch (error) {
+                console.error('验证用户名失败:', error);
+                return true; // 网络错误时不阻止提交
+            }
+        }
+        
+        // 验证邮箱
+        async function validateEmail() {
+            const email = emailInput.value.trim();
+            
+            if (!email) {
+                setFieldInvalid(emailInput, '请输入邮箱');
+                return false;
+            }
+            
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                setFieldInvalid(emailInput, '邮箱格式不正确');
+                return false;
+            }
+            
+            try {
+                const response = await fetch('/auth/check-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const result = await response.json();
+                
+                if (!result.available) {
+                    setFieldInvalid(emailInput, '邮箱已被使用');
+                    return false;
+                }
+                
+                setFieldValid(emailInput);
+                return true;
+            } catch (error) {
+                console.error('验证邮箱失败:', error);
+                return true; // 网络错误时不阻止提交
+            }
+        }
+        
+        // 设置字段为无效
+        function setFieldInvalid(field, message) {
+            field.classList.remove('is-valid');
+            field.classList.add('is-invalid');
+            const feedback = field.parentElement.querySelector('.invalid-feedback');
+            if (feedback) {
+                feedback.textContent = message;
+            }
+        }
+        
+        // 设置字段为有效
+        function setFieldValid(field) {
+            field.classList.remove('is-invalid');
+            field.classList.add('is-valid');
+        }
+        
+        // 表单提交处理
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // 验证所有字段
+            const isUsernameValid = await validateUsername();
+            const isEmailValid = await validateEmail();
+            const isPasswordMatch = validatePasswordMatch();
+            
+            if (!isUsernameValid || !isEmailValid || !isPasswordMatch) {
+                showAlert('errorAlert', '请修正表单中的错误');
+                return;
+            }
+            
+            const formData = new FormData(this);
+            const registerData = {
+                username: formData.get('username'),
+                email: formData.get('email'),
+                password: formData.get('password'),
+                confirm_password: formData.get('confirm_password')
+            };
+            
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            
+            try {
+                // 显示加载状态
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>注册中...';
+                submitBtn.disabled = true;
+                
+                // 隐藏之前的消息
+                hideAlert('errorAlert');
+                hideAlert('successAlert');
+                
+                // 发送注册请求
+                const response = await fetch('/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // 保存认证令牌和用户信息，与登录页面保持一致
+                    if (result.data && result.data.token) {
+                        localStorage.setItem('auth_token', result.data.token);
+                        localStorage.setItem('user_info', JSON.stringify(result.data.user));
+                        
+                        // 显示成功消息
+                        showAlert('successAlert', '注册成功！正在跳转到首页...');
+                        
+                        // 跳转到首页
+                        setTimeout(() => {
+                            window.location.href = result.data.redirect_url || '/';
+                        }, 2000);
+                    } else {
+                        // 如果没有token（旧版API），则跳转到登录页面
+                        showAlert('successAlert', '注册成功！正在跳转到登录页面...');
+                        
+                        // 跳转到登录页面
+                        setTimeout(() => {
+                            window.location.href = '/login?message=' + encodeURIComponent('注册成功，请登录') + '&type=success';
+                        }, 2000);
+                    }
+                } else {
+                    showAlert('errorAlert', result.error || '注册失败');
+                }
+            } catch (error) {
+                console.error('注册错误:', error);
+                showAlert('errorAlert', '网络错误，请稍后重试');
+            } finally {
+                // 恢复按钮状态
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+        
+        // 显示警告消息
+        function showAlert(alertId, message) {
+            const alert = document.getElementById(alertId);
+            const messageElement = alert.querySelector('span');
+            messageElement.textContent = message;
+            alert.classList.remove('d-none');
+        }
+        
+        // 隐藏警告消息
+        function hideAlert(alertId) {
+            const alert = document.getElementById(alertId);
+            alert.classList.add('d-none');
+        }
+        
+        // 检查是否已经登录
+        if (localStorage.getItem('auth_token')) {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
