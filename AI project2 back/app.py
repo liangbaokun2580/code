@@ -24,14 +24,6 @@ from models import db, User, ChatSession, TopologyData, NetworkDevice
 from config import Config
 from utils.database_utils import db_manager, handle_database_error
 import logging
-import sys
-
-# Avoid GBK encoding crashes on Windows console output
-try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-except Exception:
-    pass
 
 def create_app():
     app = Flask(__name__)

@@ -149,7 +149,7 @@ def register():
                 }
             })
         
-        flash('注册成功，欢迎使用AI网络工程系统！', 'success')
+        flash('注册成功，欢迎使用ANP智能化运维平台工程系统！', 'success')
         return redirect(url_for('index'))
         
     except Exception as e:

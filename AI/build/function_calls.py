@@ -114,7 +114,7 @@ FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
                             'function': {
                                 'name': 'device_reboot',
                                 'arguments': (
-                                    '{"device_ip":"192.168.1.1|192.168.1.126", '
+                                    '{"device_ip":"192.168.1.11|192.168.1.126", '
                                     '"device_brand": "dcn"}'
                                 )
                             }
@@ -169,7 +169,7 @@ FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
                             'function': {
                                 'name': 'dcn_get_config',
                                 'arguments': (
-                                    '{"device_ip": "192.168.1.1", '
+                                    '{"device_ip": "192.168.1.11", '
                                     '"config_type": "running"}'
                                 )
                             }

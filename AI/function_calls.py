@@ -104,7 +104,7 @@ FUNCTION_RESULTS = {
                             'function':
                             {
                                 'name': 'device_reboot',
-                                'arguments': '{"device_ip":"192.168.1.1|192.168.1.126", "device_brand": "dcn"}'
+                                'arguments': '{"device_ip":"192.168.1.11|192.168.1.126", "device_brand": "dcn"}'
                             }
                         }
                     ]
@@ -157,7 +157,7 @@ FUNCTION_RESULTS = {
                             'function':
                             {
                                 'name': 'dcn_get_config',
-                                'arguments': '{"device_ip": "192.168.1.1", "config_type": "running"}'
+                                'arguments': '{"device_ip": "192.168.1.11", "config_type": "running"}'
                             }
                         },
                         {
@@ -198,7 +198,7 @@ FUNCTION_RESULTS = {
                             'function':
                             {
                                 'name': 'dcn_modify_config',
-                                'arguments': '{"device_ip": "192.168.1.1", "config_type": "interface", "commands": ["int e1/0/2", "switchport access vlan 2"]}'
+                                'arguments': '{"device_ip": "192.168.1.11", "config_type": "interface", "commands": ["int e1/0/2", "switchport access vlan 2"]}'
                             }
                         }
                     ]

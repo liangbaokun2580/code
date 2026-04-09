@@ -10,7 +10,7 @@ Flask-SocketIO==5.3.6
 
 # Database
 SQLAlchemy==2.0.21
-psycopg2-binary==2.9.7  # PostgreSQL adapter
+psycopg2-binary==2.9.11  # PostgreSQL adapter
 PyMySQL==1.1.0  # MySQL adapter
 
 # AI and OpenAI
