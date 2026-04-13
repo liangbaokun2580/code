@@ -308,47 +308,72 @@ def scan_network():
             scan_type=scan_type,
             user_id=current_user.id
         )
+
+        if scan_result.get('error'):
+            return jsonify({
+                'success': False,
+                'error': scan_result.get('error'),
+                'data': {
+                    'scan_result': scan_result,
+                    'devices_saved': 0
+                }
+            }), 500
         
         # 保存扫描到的设备
         devices_saved = 0
-        for device_info in scan_result.get('devices', []):
-            device = NetworkDevice.query.filter_by(
-                user_id=current_user.id,
-                ip_address=device_info['ip_address']
-            ).first()
-            
-            if device:
-                # 更新现有设备
-                device.hostname = device_info.get('hostname', device.hostname)
-                device.device_type = device_info.get('device_type', device.device_type)
-                device.vendor = device_info.get('vendor', device.vendor)
-                device.model = device_info.get('model', device.model)
-                device.mac_address = device_info.get('mac_address', device.mac_address)
-                device.status = device_info.get('status', 'unknown')
-                device.last_seen = datetime.utcnow()
-                device.updated_at = datetime.utcnow()
-            else:
-                # 创建新设备
-                device = NetworkDevice(
+        persistence_error = None
+        try:
+            for device_info in scan_result.get('devices', []):
+                ip_address = device_info.get('ip_address') or device_info.get('ip')
+                if not ip_address:
+                    continue
+
+                device = NetworkDevice.query.filter_by(
                     user_id=current_user.id,
-                    device_id=device_info.get('device_id', str(uuid.uuid4())),
-                    hostname=device_info.get('hostname', ''),
-                    ip_address=device_info['ip_address'],
-                    device_type=device_info.get('device_type', 'unknown'),
-                    vendor=device_info.get('vendor', ''),
-                    model=device_info.get('model', ''),
-                    mac_address=device_info.get('mac_address', ''),
-                    status=device_info.get('status', 'unknown'),
-                    last_seen=datetime.utcnow()
-                )
-                db.session.add(device)
+                    ip_address=ip_address
+                ).first()
+                
+                if device:
+                    # 更新现有设备
+                    device.hostname = device_info.get('hostname', device.hostname)
+                    device.device_type = device_info.get('device_type', device.device_type)
+                    device.vendor = device_info.get('vendor', device.vendor)
+                    device.model = device_info.get('model', device.model)
+                    device.mac_address = device_info.get('mac_address', device.mac_address)
+                    device.status = device_info.get('status', 'unknown')
+                    device.last_seen = datetime.utcnow()
+                    device.updated_at = datetime.utcnow()
+                else:
+                    # 创建新设备
+                    device = NetworkDevice(
+                        user_id=current_user.id,
+                        device_id=device_info.get('device_id', str(uuid.uuid4())),
+                        hostname=device_info.get('hostname', ''),
+                        ip_address=ip_address,
+                        device_type=device_info.get('device_type', 'unknown'),
+                        vendor=device_info.get('vendor', ''),
+                        model=device_info.get('model', ''),
+                        mac_address=device_info.get('mac_address', ''),
+                        status=device_info.get('status', 'unknown'),
+                        last_seen=datetime.utcnow()
+                    )
+                    db.session.add(device)
+                
+                devices_saved += 1
             
-            devices_saved += 1
-        
-        db.session.commit()
-        
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            persistence_error = f'保存扫描结果失败: {str(db_error)}'
+
         # 异步同步到云端
-        cloud_sync.sync_network_scan_result(scan_result, current_user.id)
+        try:
+            cloud_sync.sync_network_scan_result(scan_result, current_user.id)
+        except Exception as sync_error:
+            if persistence_error:
+                persistence_error = f'{persistence_error}; 云同步失败: {str(sync_error)}'
+            else:
+                persistence_error = f'云同步失败: {str(sync_error)}'
         
         return jsonify({
             'success': True,
@@ -356,7 +381,8 @@ def scan_network():
             'data': {
                 'scan_result': scan_result,
                 'devices_saved': devices_saved
-            }
+            },
+            'warning': persistence_error
         })
         
     except Exception as e:

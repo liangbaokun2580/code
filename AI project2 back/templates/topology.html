@@ -713,6 +713,7 @@
         let ctx = null;
         let currentMode = 'auto';
         let isScanning = false;
+        let scanAbortController = null;
         let selectedDevices = [];
         let viewOffset = { x: 0, y: 0 };
         let zoomLevel = 1;
@@ -1111,35 +1112,61 @@
             if (isScanning) return;
             
             isScanning = true;
+            scanAbortController = new AbortController();
             document.getElementById('startScanBtn').style.display = 'none';
             document.getElementById('stopScanBtn').style.display = 'block';
             document.getElementById('scanProgress').style.display = 'block';
             
             updateTopologyStatus('正在扫描网络...');
+            updateScanProgress(10, '初始化扫描...');
+
+            let scanRange = '192.168.1.0/24';
+            if (localDeviceInfo && localDeviceInfo.ip) {
+                const ipParts = localDeviceInfo.ip.split('.');
+                if (ipParts.length === 4) {
+                    scanRange = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.0/24`;
+                }
+            }
             
-            fetch('/api/topology/advanced-scan', {
+            fetch('/api/topology/scan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                signal: scanAbortController.signal,
                 body: JSON.stringify({
+                    scan_range: scanRange,
                     scan_type: 'full',
-                    depth: 3,
-                    concurrency: 50,
-                    timeout: 5
                 })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'started') {
-                    console.log('扫描已开始');
-                } else {
-                    throw new Error(data.message || '启动扫描失败');
+                if (!data.success) {
+                    throw new Error(data.error || data.message || '启动扫描失败');
+                }
+
+                updateScanProgress(90, '处理扫描结果...');
+                handleScanComplete({
+                    topology: {
+                        devices: (data.data && data.data.scan_result && data.data.scan_result.devices) || [],
+                        connections: topologyData.connections || []
+                    }
+                });
+                if (data.warning) {
+                    updateTopologyStatus('扫描完成，但有告警: ' + data.warning);
                 }
             })
             .catch(error => {
+                if (error.name === 'AbortError') {
+                    updateTopologyStatus('扫描已取消');
+                    return;
+                }
                 console.error('扫描启动失败:', error);
-                stopNetworkScan();
+                isScanning = false;
+                scanAbortController = null;
+                document.getElementById('startScanBtn').style.display = 'block';
+                document.getElementById('stopScanBtn').style.display = 'none';
+                document.getElementById('scanProgress').style.display = 'none';
                 updateTopologyStatus('扫描启动失败: ' + error.message);
             });
         }
@@ -1147,22 +1174,17 @@
         // 停止网络扫描
         function stopNetworkScan() {
             if (!isScanning) return;
-            
-            fetch('/api/topology/stop-scan', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                console.log('扫描已停止');
-            })
-            .catch(error => {
-                console.error('停止扫描失败:', error);
-            })
-            .finally(() => {
-                isScanning = false;
-                document.getElementById('startScanBtn').style.display = 'block';
-                document.getElementById('stopScanBtn').style.display = 'none';
-                document.getElementById('scanProgress').style.display = 'none';
-                updateTopologyStatus('扫描已停止');
-            });
+
+            if (scanAbortController) {
+                scanAbortController.abort();
+            }
+
+            isScanning = false;
+            scanAbortController = null;
+            document.getElementById('startScanBtn').style.display = 'block';
+            document.getElementById('stopScanBtn').style.display = 'none';
+            document.getElementById('scanProgress').style.display = 'none';
+            updateTopologyStatus('扫描已停止');
         }
         
         // 更新扫描进度
@@ -1175,6 +1197,7 @@
         // 处理扫描完成
         function handleScanComplete(data) {
             isScanning = false;
+            scanAbortController = null;
             document.getElementById('startScanBtn').style.display = 'block';
             document.getElementById('stopScanBtn').style.display = 'none';
             document.getElementById('scanProgress').style.display = 'none';
@@ -3021,9 +3044,28 @@
             if (!data || typeof data !== 'object') {
                 return { devices: [], connections: [] };
             }
+
+            const devices = Array.isArray(data.devices) ? data.devices.map((device, index) => {
+                const normalizedIp = device.ip || device.ip_address || '';
+                const normalizedName = device.name || device.hostname || normalizedIp || 'Unknown';
+                const fallbackId = normalizedIp || `device_${index}`;
+                return {
+                    ...device,
+                    id: device.id || device.device_id || fallbackId,
+                    device_id: device.device_id || device.id || fallbackId,
+                    ip: normalizedIp,
+                    ip_address: device.ip_address || normalizedIp,
+                    name: normalizedName,
+                    hostname: device.hostname || normalizedName,
+                    mac: device.mac || device.mac_address || '',
+                    mac_address: device.mac_address || device.mac || '',
+                    type: device.type || device.device_type || 'unknown',
+                    device_type: device.device_type || device.type || 'unknown'
+                };
+            }) : [];
             
             return {
-                devices: Array.isArray(data.devices) ? data.devices : [],
+                devices: devices,
                 connections: Array.isArray(data.connections) ? data.connections : []
             };
         }

@@ -3,11 +3,13 @@ import subprocess
 import threading
 import ipaddress
 import uuid
+import platform
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import logging
 import time
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class NetworkService:
     """网络服务类，提供网络扫描和设备发现功能"""
@@ -16,70 +18,105 @@ class NetworkService:
         self.logger = logging.getLogger(__name__)
         self.scan_timeout = 5  # 扫描超时时间（秒）
         self.max_threads = 50  # 最大并发线程数
+        self.is_windows = platform.system().lower().startswith('win')
+        self.is_macos = platform.system().lower() == 'darwin'
+
+    def _run_command(self, command: List[str], timeout: int = 10):
+        """统一执行系统命令，避免重复异常处理逻辑。"""
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout
+        )
+
+    def _build_ping_commands(self, host: str, timeout: int = 3) -> List[List[str]]:
+        """构建跨平台ping命令候选列表，按顺序尝试。"""
+        if self.is_windows:
+            return [['ping', '-n', '1', '-w', str(timeout * 1000), host]]
+        if self.is_macos:
+            return [
+                ['ping', '-c', '1', '-W', str(timeout * 1000), host],
+                ['ping', '-c', '1', '-t', str(timeout), host]
+            ]
+        return [['ping', '-c', '1', '-W', str(timeout), host]]
+
+    def _build_traceroute_command(self, target: str, max_hops: int = 30) -> List[str]:
+        if self.is_windows:
+            return ['tracert', '-h', str(max_hops), target]
+        return ['traceroute', '-m', str(max_hops), target]
+
+    def _extract_ping_latency(self, output: str) -> Optional[int]:
+        """解析ping输出中的时延，兼容中英文及小于1ms场景。"""
+        if not output:
+            return None
+
+        time_patterns = [
+            r'(?:时间|time)[=<]\s*([0-9]+)\s*ms',
+            r'(\d+(?:\.\d+)?)\s*ms'
+        ]
+        for pattern in time_patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                return int(round(float(match.group(1))))
+        return None
     
     def ping_host(self, host: str, timeout: int = 3) -> bool:
         """Ping主机检测是否在线"""
-        try:
-            # Windows系统使用ping命令
-            result = subprocess.run(
-                ['ping', '-n', '1', '-w', str(timeout * 1000), host],
-                capture_output=True,
-                text=True,
-                timeout=timeout + 2
-            )
-            return result.returncode == 0
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError):
-            return False
-        except Exception as e:
-            self.logger.error(f"Ping {host} 失败: {e}")
-            return False
+        for command in self._build_ping_commands(host, timeout):
+            try:
+                result = self._run_command(command, timeout=timeout + 2)
+                return result.returncode == 0
+            except FileNotFoundError:
+                continue
+            except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                return False
+            except Exception as e:
+                self.logger.error(f"Ping {host} 失败: {e}")
+                return False
+        return False
     
     def ping_host_with_latency(self, host: str, timeout: int = 3) -> dict:
         """Ping主机检测是否在线并返回延迟信息"""
-        try:
-            start_time = time.time()
-            # Windows系统使用ping命令
-            result = subprocess.run(
-                ['ping', '-n', '1', '-w', str(timeout * 1000), host],
-                capture_output=True,
-                text=True,
-                timeout=timeout + 2
-            )
-            end_time = time.time()
-            
-            is_reachable = result.returncode == 0
-            latency = None
-            
-            if is_reachable:
-                # 从ping输出中提取延迟时间
-                output = result.stdout
-                # 匹配Windows ping输出中的时间信息，例如: "时间=1ms" 或 "time=1ms"
-                time_match = re.search(r'(?:时间|time)[=<]([0-9]+)ms', output, re.IGNORECASE)
-                if time_match:
-                    latency = int(time_match.group(1))
-                else:
-                    # 如果无法从输出解析，使用测量的时间
-                    latency = round((end_time - start_time) * 1000)
-            
-            return {
-                'reachable': is_reachable,
-                'latency': latency,
-                'output': result.stdout if is_reachable else result.stderr
-            }
-            
-        except (subprocess.TimeoutExpired, subprocess.SubprocessError):
-            return {
-                'reachable': False,
-                'latency': None,
-                'output': 'Ping超时'
-            }
-        except Exception as e:
-            self.logger.error(f"Ping {host} 失败: {e}")
-            return {
-                'reachable': False,
-                'latency': None,
-                'output': f'Ping失败: {str(e)}'
-            }
+        for command in self._build_ping_commands(host, timeout):
+            try:
+                start_time = time.time()
+                result = self._run_command(command, timeout=timeout + 2)
+                end_time = time.time()
+
+                is_reachable = result.returncode == 0
+                latency = None
+                if is_reachable:
+                    latency = self._extract_ping_latency(result.stdout)
+                    if latency is None:
+                        latency = round((end_time - start_time) * 1000)
+
+                return {
+                    'reachable': is_reachable,
+                    'latency': latency,
+                    'output': result.stdout if is_reachable else result.stderr
+                }
+            except FileNotFoundError:
+                continue
+            except (subprocess.TimeoutExpired, subprocess.SubprocessError):
+                return {
+                    'reachable': False,
+                    'latency': None,
+                    'output': 'Ping超时'
+                }
+            except Exception as e:
+                self.logger.error(f"Ping {host} 失败: {e}")
+                return {
+                    'reachable': False,
+                    'latency': None,
+                    'output': f'Ping失败: {str(e)}'
+                }
+
+        return {
+            'reachable': False,
+            'latency': None,
+            'output': '系统缺少ping命令'
+        }
     
     def scan_port(self, host: str, port: int, timeout: float = 1.0) -> bool:
         """扫描单个端口"""
@@ -105,25 +142,20 @@ class NetworkService:
             测试结果字典
         """
         try:
-            if test_type == 'ping':
-                return self._ping_test(target_ip, count)
-            elif test_type == 'traceroute':
-                return self._traceroute_test(target_ip)
-            elif test_type == 'telnet':
-                if port is None:
-                    port = 23  # 默认telnet端口
-                return self._telnet_test(target_ip, port)
-            elif test_type == 'ssh':
-                if port is None:
-                    port = 22  # 默认ssh端口
-                return self._ssh_test(target_ip, port)
-            else:
+            dispatch = {
+                'ping': lambda: self._ping_test(target_ip, count),
+                'traceroute': lambda: self._traceroute_test(target_ip),
+                'telnet': lambda: self._telnet_test(target_ip, port if port is not None else 23),
+                'ssh': lambda: self._ssh_test(target_ip, port if port is not None else 22),
+            }
+            if test_type not in dispatch:
                 return {
                     'success': False,
                     'error': f'不支持的测试类型: {test_type}',
                     'test_type': test_type,
                     'target_ip': target_ip
                 }
+            return dispatch[test_type]()
         except Exception as e:
             self.logger.error(f"连接性测试失败 {target_ip}: {e}")
             return {
@@ -172,13 +204,7 @@ class NetworkService:
     def _traceroute_test(self, target_ip: str) -> Dict[str, Any]:
         """执行traceroute测试"""
         try:
-            # Windows使用tracert命令
-            result = subprocess.run(
-                ['tracert', '-h', '30', target_ip],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            result = self._run_command(self._build_traceroute_command(target_ip, 30), timeout=60)
             
             return {
                 'success': result.returncode == 0,
@@ -278,28 +304,23 @@ class NetworkService:
     def scan_host_ports(self, host: str, ports: List[int]) -> List[int]:
         """扫描主机的多个端口"""
         open_ports = []
-        
-        def scan_single_port(port):
-            if self.scan_port(host, port):
-                open_ports.append(port)
-        
-        # 使用线程池扫描端口
-        threads = []
-        for port in ports:
-            if len(threads) >= self.max_threads:
-                # 等待一些线程完成
-                for t in threads[:10]:
-                    t.join()
-                threads = threads[10:]
-            
-            thread = threading.Thread(target=scan_single_port, args=(port,))
-            thread.start()
-            threads.append(thread)
-        
-        # 等待所有线程完成
-        for thread in threads:
-            thread.join()
-        
+        if not ports:
+            return open_ports
+
+        max_workers = min(self.max_threads, len(ports))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_port = {
+                executor.submit(self.scan_port, host, port): port
+                for port in ports
+            }
+            for future in as_completed(future_to_port):
+                port = future_to_port[future]
+                try:
+                    if future.result():
+                        open_ports.append(port)
+                except Exception:
+                    continue
+
         return sorted(open_ports)
     
     def get_hostname(self, ip: str) -> str:
@@ -417,30 +438,25 @@ class NetworkService:
         """扫描网络范围内的活跃主机"""
         try:
             network = ipaddress.ip_network(network_range, strict=False)
+            host_list = [str(ip) for ip in network.hosts()]
             active_hosts = []
-            
-            def ping_and_collect(ip_str):
-                if self.ping_host(ip_str):
-                    active_hosts.append(ip_str)
-            
-            # 使用线程池并发ping
-            threads = []
-            for ip in network.hosts():
-                ip_str = str(ip)
-                
-                if len(threads) >= self.max_threads:
-                    # 等待一些线程完成
-                    for t in threads[:20]:
-                        t.join()
-                    threads = threads[20:]
-                
-                thread = threading.Thread(target=ping_and_collect, args=(ip_str,))
-                thread.start()
-                threads.append(thread)
-            
-            # 等待所有线程完成
-            for thread in threads:
-                thread.join()
+
+            if not host_list:
+                return active_hosts
+
+            max_workers = min(self.max_threads, len(host_list))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_ip = {
+                    executor.submit(self.ping_host, ip_str): ip_str
+                    for ip_str in host_list
+                }
+                for future in as_completed(future_to_ip):
+                    ip_str = future_to_ip[future]
+                    try:
+                        if future.result():
+                            active_hosts.append(ip_str)
+                    except Exception:
+                        continue
             
             return sorted(active_hosts, key=lambda x: ipaddress.ip_address(x))
             
@@ -455,6 +471,7 @@ class NetworkService:
         
         try:
             self.logger.info(f"开始扫描网络: {scan_range}, 类型: {scan_type}")
+            network = ipaddress.ip_network(scan_range, strict=False)
             
             # 扫描活跃主机
             active_hosts = self.scan_network_range(scan_range)
@@ -513,7 +530,7 @@ class NetworkService:
                 'start_time': start_time.isoformat(),
                 'end_time': end_time.isoformat(),
                 'duration_seconds': scan_duration,
-                'total_hosts_scanned': len(list(ipaddress.ip_network(scan_range, strict=False).hosts())),
+                'total_hosts_scanned': sum(1 for _ in network.hosts()),
                 'active_hosts_found': len(active_hosts),
                 'devices': devices
             }
@@ -671,12 +688,7 @@ class NetworkService:
     def trace_route(self, target: str, max_hops: int = 30) -> List[Dict[str, Any]]:
         """执行路由跟踪"""
         try:
-            result = subprocess.run(
-                ['tracert', '-h', str(max_hops), target],
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
+            result = self._run_command(self._build_traceroute_command(target, max_hops), timeout=60)
             
             hops = []
             lines = result.stdout.split('\n')

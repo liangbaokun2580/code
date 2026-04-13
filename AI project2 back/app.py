@@ -22,7 +22,7 @@ from api.webssh import webssh_bp
 from api.settings import settings_bp
 from models import db, User, ChatSession, TopologyData, NetworkDevice
 from config import Config
-from utils.database_utils import db_manager, handle_database_error
+from utils.database_utils import db_manager, handle_database_error, is_database_corruption_error
 import logging
 
 def create_app():
@@ -64,7 +64,11 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_exception(e):
         # 检查是否是数据库错误
-        if 'sqlite3.OperationalError' in str(type(e)) or 'disk I/O error' in str(e):
+        if (
+            'sqlite3.OperationalError' in str(type(e)) or
+            'disk I/O error' in str(e) or
+            is_database_corruption_error(e)
+        ):
             error_info = handle_database_error(e)
             logging.error(f"数据库错误: {error_info}")
             
