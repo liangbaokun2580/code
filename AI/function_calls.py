@@ -1,7 +1,14 @@
-# Function Call 结果处理数据配置文件
-# 存储function_name对应的结果处理数据
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Function Call 结果处理数据配置文件
+存储function_name对应的结果处理数据
+"""
 
-FUNCTION_RESULTS = {
+from typing import Dict, Any
+
+
+FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
     "get_weather": {
         "response": {
             "id": "chatcmpl-weather-result-001",
@@ -12,7 +19,10 @@ FUNCTION_RESULTS = {
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": "根据天气数据，今天北京天气晴朗，温度25°C，湿度60%，风速5km/h。适合外出活动。"
+                    "content": (
+                        "根据天气数据，今天北京天气晴朗，温度25°C，"
+                        "湿度60%，风速5km/h。适合外出活动。"
+                    )
                 },
                 "finish_reason": "stop"
             }],
@@ -101,10 +111,12 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5Z2EECSTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'device_reboot',
-                                'arguments': '{"device_ip":"192.168.1.11|192.168.1.126", "device_brand": "dcn"}'
+                                'arguments': (
+                                    '{"device_ip":"192.168.1.11|192.168.1.126", '
+                                    '"device_brand": "dcn"}'
+                                )
                             }
                         }
                     ]
@@ -154,19 +166,23 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5ZSEECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_get_config',
-                                'arguments': '{"device_ip": "192.168.1.11", "config_type": "running"}'
+                                'arguments': (
+                                    '{"device_ip": "192.168.1.11", '
+                                    '"config_type": "running"}'
+                                )
                             }
                         },
                         {
                             'id': 'call_5ZSEECDTNVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_get_config',
-                                'arguments': '{"device_ip": "192.168.1.126", "config_type": "running"}'
+                                'arguments': (
+                                    '{"device_ip": "192.168.1.126", '
+                                    '"config_type": "running"}'
+                                )
                             }
                         }
                     ]
@@ -195,10 +211,13 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5aSEECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_modify_config',
-                                'arguments': '{"device_ip": "192.168.1.11", "config_type": "interface", "commands": ["int e1/0/2", "switchport access vlan 2"]}'
+                                'arguments': (
+                                    '{"device_ip": "192.168.1.126", '
+                                    '"commands": ["int vlan164","ip address 192.168.7.1 255.255.255.0","exit","interface Ethernet1/0/22","switchport access vlan 164","exit","router ospf 1","network 192.168.7.1 0.0.0.255 area 0","exit","interface Ethernet1/0/7", '
+                                    '"no ip access-group ACL in"]}'
+                                )
                             }
                         }
                     ]
@@ -222,7 +241,7 @@ FUNCTION_RESULTS = {
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": "配置修改完成，现在设备已经可以正常连接路由器，如果还有问题，请联系技术支持。"
+                    "content": "配置修改完成，网络问题已修复，请测试网络连接。"
                 },
                 "finish_reason": "stop"
             }],

@@ -1,7 +1,14 @@
-# 关键词数据配置文件
-# 存储关键词对应的响应数据和function call数据
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+关键词数据配置文件
+存储关键词对应的响应数据和function call数据
+"""
 
-KEYWORDS_DATA = {
+from typing import Dict, Any
+
+
+KEYWORDS_DATA: Dict[str, Dict[str, Any]] = {
     "天气": {
         "response": {
             "id": "chatcmpl-weather-001",
@@ -125,8 +132,7 @@ KEYWORDS_DATA = {
                         {
                             'id': 'call_5Z2EECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'get_network_status',
                                 'arguments': '{"include_details":true}'
                             }
@@ -134,8 +140,7 @@ KEYWORDS_DATA = {
                         {
                             'id': 'call_5Z2EECDTdVeEI52jhdVZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'get_network_info',
                                 'arguments': ''
                             }
@@ -166,8 +171,7 @@ KEYWORDS_DATA = {
                         {
                             'id': 'call_5ZSEECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'get_network_info',
                                 'arguments': ''
                             }
@@ -175,8 +179,7 @@ KEYWORDS_DATA = {
                         {
                             'id': 'call_5Z2EECDTdVeEIB2jhdVZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'get_network_status',
                                 'arguments': '{"include_details":true}'
                             }

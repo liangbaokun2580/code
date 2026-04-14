@@ -547,7 +547,7 @@
                             <input type="password" class="form-control form-control-sm" id="devicePassword" placeholder="密码">
                         </div>
                         <div class="d-grid gap-2">
-                            <button class="btn btn-primary btn-sm" onclick="addManualDevice()">
+                            <button class="btn btn-primary btn-sm" id="deviceFormSubmitBtn" onclick="saveDeviceForm()">
                                 <i class="fas fa-plus me-1"></i>添加设备
                             </button>
                             <button class="btn btn-secondary btn-sm" onclick="hideAddDeviceForm()">
@@ -722,6 +722,7 @@
         let selectedDevice = null;
         let isDraggingDevice = false;
         let localDeviceInfo = {};
+        let editingDevice = null;
         
         // 设备品牌型号数据
         const deviceModels = {
@@ -1618,11 +1619,11 @@
             
             // 填充编辑表单
             const device = contextMenuDevice;
+            editingDevice = device;
             document.getElementById('deviceName').value = device.name || '';
-            document.getElementById('deviceIP').value = device.ip || '';
-            document.getElementById('deviceMAC').value = device.mac || '';
+            document.getElementById('deviceIP').value = device.ip || device.ip_address || '';
             document.getElementById('deviceType').value = device.device_type || device.type || 'pc';
-            document.getElementById('deviceBrand').value = device.brand || 'cisco';
+            document.getElementById('deviceBrand').value = device.brand || '';
             updateModelOptions();
             document.getElementById('deviceModel').value = device.model || '';
             
@@ -1641,8 +1642,15 @@
             document.getElementById('deviceUsername').value = username;
             document.getElementById('devicePassword').value = password;
             
-            // 显示添加设备表单
-            showAddDeviceForm();
+            // 显示编辑表单
+            const formTitle = document.getElementById('formTitle');
+            const submitBtn = document.getElementById('deviceFormSubmitBtn');
+            formTitle.textContent = '编辑设备';
+            submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>保存修改';
+            document.getElementById('deviceForm').style.display = 'block';
+            if (currentMode !== 'manual') {
+                switchMode('manual');
+            }
             
             hideContextMenu();
         }
@@ -2062,8 +2070,10 @@
         
         // 手动设备管理
         function showAddDeviceForm(deviceType) {
-            document.getElementById('deviceType').value = deviceType;
-            document.getElementById('formTitle').textContent = '添加' + getDeviceTypeName(deviceType);
+            editingDevice = null;
+            document.getElementById('deviceType').value = deviceType || 'pc';
+            document.getElementById('formTitle').textContent = '添加' + getDeviceTypeName(deviceType || 'pc');
+            document.getElementById('deviceFormSubmitBtn').innerHTML = '<i class="fas fa-plus me-1"></i>添加设备';
             document.getElementById('deviceForm').style.display = 'block';
             
             // 清空表单
@@ -2071,7 +2081,8 @@
             document.getElementById('deviceIP').value = '';
             document.getElementById('deviceBrand').value = '';
             document.getElementById('deviceModel').value = '';
-            document.getElementById('deviceInterfaces').value = '';
+            document.getElementById('deviceUsername').value = '';
+            document.getElementById('devicePassword').value = '';
             
             updateModelOptions();
         }
@@ -2107,10 +2118,11 @@
         }
         
         function hideAddDeviceForm() {
+            editingDevice = null;
             document.getElementById('deviceForm').style.display = 'none';
         }
         
-        function addManualDevice() {
+        function saveDeviceForm() {
             const name = document.getElementById('deviceName').value.trim();
             const ip = document.getElementById('deviceIP').value.trim();
             const type = document.getElementById('deviceType').value;
@@ -2132,21 +2144,51 @@
                     password: password
                 });
             }
-            
-            const device = {
-                id: 'manual_' + Date.now(),
-                name: name,
-                ip: ip,
-                device_type: type,
-                brand: brand,
-                model: model,
-                status: 'unknown',
-                credentials: credentials,
-                x: 100 + ((topologyData.devices ? topologyData.devices.length : 0) % 6) * 120,
-                y: 100 + Math.floor((topologyData.devices ? topologyData.devices.length : 0) / 6) * 120
-            };
-            
-            topologyData.devices.push(device);
+
+            if (!topologyData.devices) {
+                topologyData.devices = [];
+            }
+
+            const duplicateDevice = topologyData.devices.find(device =>
+                device !== editingDevice && (device.ip === ip || device.ip_address === ip)
+            );
+            if (duplicateDevice) {
+                alert('该IP地址对应的设备已存在');
+                return;
+            }
+
+            const wasEditing = !!editingDevice;
+
+            if (editingDevice) {
+                editingDevice.name = name;
+                editingDevice.hostname = name;
+                editingDevice.ip = ip;
+                editingDevice.ip_address = ip;
+                editingDevice.device_type = type;
+                editingDevice.type = type;
+                editingDevice.brand = brand;
+                editingDevice.model = model;
+                editingDevice.credentials = credentials;
+                editingDevice.updated_at = new Date().toISOString();
+            } else {
+                const device = {
+                    id: 'manual_' + Date.now(),
+                    name: name,
+                    hostname: name,
+                    ip: ip,
+                    ip_address: ip,
+                    device_type: type,
+                    type: type,
+                    brand: brand,
+                    model: model,
+                    status: 'unknown',
+                    credentials: credentials,
+                    x: 100 + ((topologyData.devices ? topologyData.devices.length : 0) % 6) * 120,
+                    y: 100 + Math.floor((topologyData.devices ? topologyData.devices.length : 0) / 6) * 120
+                };
+                topologyData.devices.push(device);
+            }
+
             drawTopology();
             updateDeviceList();
             updateTopologyInfo();
@@ -2157,13 +2199,11 @@
                 window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
             }
             
-            updateTopologyStatus('已添加设备: ' + name);
-            
-            // 如果有SSH凭据，显示提示
+            const actionText = wasEditing ? '已更新设备: ' : '已添加设备: ';
             if (credentials) {
-                updateTopologyStatus('已添加设备: ' + name + ' (SSH凭据已保存)');
+                updateTopologyStatus(actionText + name + ' (SSH凭据已保存)');
             } else {
-                updateTopologyStatus('已添加设备: ' + name);
+                updateTopologyStatus(actionText + name);
             }
         }
         
