@@ -9,6 +9,7 @@ from typing import Dict, List, Any, Optional
 import logging
 import time
 import re
+from threading import Lock
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class NetworkService:
@@ -20,6 +21,83 @@ class NetworkService:
         self.max_threads = 50  # 最大并发线程数
         self.is_windows = platform.system().lower().startswith('win')
         self.is_macos = platform.system().lower() == 'darwin'
+
+    _scan_jobs: Dict[str, Dict[str, Any]] = {}
+    _scan_jobs_lock = Lock()
+
+    def start_scan(self, target_network: str = '192.168.1.0/24', scan_type: str = 'ping',
+                   user_id: Optional[int] = None) -> str:
+        """Start a background scan and return a scan identifier."""
+        scan_id = str(uuid.uuid4())
+        job = {
+            'scan_id': scan_id,
+            'status': 'queued',
+            'progress': 0,
+            'target_network': target_network,
+            'scan_type': scan_type,
+            'user_id': user_id,
+            'created_at': datetime.utcnow().isoformat(),
+            'started_at': None,
+            'completed_at': None,
+            'result': None,
+            'error': None,
+        }
+        with self._scan_jobs_lock:
+            self._scan_jobs[scan_id] = job
+
+        worker = threading.Thread(
+            target=self._run_scan_job,
+            args=(scan_id, target_network, scan_type, user_id),
+            daemon=True,
+        )
+        worker.start()
+        return scan_id
+
+    def _run_scan_job(self, scan_id: str, target_network: str, scan_type: str,
+                      user_id: Optional[int]) -> None:
+        """Execute a queued scan job."""
+        with self._scan_jobs_lock:
+            job = self._scan_jobs.get(scan_id)
+            if not job:
+                return
+            job['status'] = 'running'
+            job['progress'] = 10
+            job['started_at'] = datetime.utcnow().isoformat()
+
+        try:
+            result = self.scan_network(
+                scan_range=target_network,
+                scan_type=scan_type,
+                user_id=user_id,
+            )
+            status = 'failed' if result.get('error') else 'completed'
+            with self._scan_jobs_lock:
+                job = self._scan_jobs.get(scan_id)
+                if not job:
+                    return
+                job['status'] = status
+                job['progress'] = 100
+                job['completed_at'] = datetime.utcnow().isoformat()
+                job['result'] = result
+                job['error'] = result.get('error')
+        except Exception as exc:
+            self.logger.error("Background scan %s failed: %s", scan_id, exc)
+            with self._scan_jobs_lock:
+                job = self._scan_jobs.get(scan_id)
+                if not job:
+                    return
+                job['status'] = 'failed'
+                job['progress'] = 100
+                job['completed_at'] = datetime.utcnow().isoformat()
+                job['error'] = str(exc)
+
+    def get_scan_status(self, scan_id: str) -> Optional[Dict[str, Any]]:
+        """Return the latest snapshot of a background scan job."""
+        with self._scan_jobs_lock:
+            job = self._scan_jobs.get(scan_id)
+            if not job:
+                return None
+            return dict(job)
 
     def _run_command(self, command: List[str], timeout: int = 10):
         """统一执行系统命令，避免重复异常处理逻辑。"""

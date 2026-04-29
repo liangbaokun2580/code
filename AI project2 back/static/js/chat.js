@@ -359,6 +359,7 @@ class ChatManager {
             
             // 隐藏打字指示器
             this.hideTypingIndicator();
+            this.hideToolExecutionModal();
 
             const aiMessage = response.data.ai_message;
             
@@ -562,7 +563,8 @@ class ChatManager {
     async executeToolCalls(toolCalls) {
         const toolResults = [];
         
-        for (const toolCall of toolCalls) {
+        try {
+            for (const toolCall of toolCalls) {
             try {
                 // 处理不同的工具调用结构
                 const toolName = toolCall.name || (toolCall.function && toolCall.function.name);
@@ -655,9 +657,11 @@ class ChatManager {
         }
         
         // 隐藏工具执行模态框
-        this.hideToolExecutionModal();
         
         // 将工具执行结果发送给AI进行处理
+        } finally {
+            this.hideToolExecutionModal();
+        }
         await this.sendToolResultsToAI(toolResults);
     }
     
@@ -948,6 +952,7 @@ class ChatManager {
     
     async sendToolResultsToAI(toolResults) {
         try {
+            this.hideToolExecutionModal();
             // 显示AI处理工具结果的指示器
             this.showTypingIndicator();
 
@@ -999,6 +1004,8 @@ class ChatManager {
             this.hideTypingIndicator();
             this.addMessage('error', `处理工具结果失败: ${error.message}`);
             Utils.showNotification('处理工具结果失败', 'error');
+        } finally {
+            this.hideToolExecutionModal();
         }
     }
 

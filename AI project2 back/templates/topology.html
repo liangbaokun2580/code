@@ -459,6 +459,15 @@
                                 <div><strong>MAC地址:</strong> <span id="localMAC">-</span></div>
                                 <div><strong>网关:</strong> <span id="localGateway">-</span></div>
                             </div>
+                            <div class="mt-2">
+                                <label class="form-label form-label-sm mb-1" for="gatewayInput">Gateway Override</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" id="gatewayInput" placeholder="192.168.1.1">
+                                    <button class="btn btn-outline-primary" type="button" onclick="saveGatewayOverride()">Save</button>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearGatewayOverride()">Clear</button>
+                                </div>
+                                <small class="text-muted d-block mt-1" id="gatewaySaveStatus"></small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -835,6 +844,55 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeTopologyPage();
         });
+
+        function renderGatewayInfo(gateway, overridden = false) {
+            document.getElementById('localGateway').textContent = gateway || '-';
+            document.getElementById('gatewayInput').value = gateway || '';
+            const statusEl = document.getElementById('gatewaySaveStatus');
+            if (!statusEl) return;
+            statusEl.textContent = overridden ? 'Using saved gateway override for this session.' : '';
+        }
+
+        function saveGatewayOverride() {
+            const gateway = document.getElementById('gatewayInput').value.trim();
+            const statusEl = document.getElementById('gatewaySaveStatus');
+            statusEl.textContent = 'Saving...';
+
+            fetch('/api/topology/local-info/gateway', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ gateway })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save gateway');
+                }
+                if (!localDeviceInfo) {
+                    localDeviceInfo = {};
+                }
+                localDeviceInfo.gateway = data.gateway || null;
+                localDeviceInfo.gateway_overridden = Boolean(data.gateway);
+                renderGatewayInfo(localDeviceInfo.gateway, localDeviceInfo.gateway_overridden);
+                try {
+                    localStorage.setItem('local_device_info', JSON.stringify(localDeviceInfo));
+                } catch (e) {
+                    console.warn('Failed to cache local gateway override', e);
+                }
+                statusEl.textContent = data.message || 'Gateway updated';
+            })
+            .catch(error => {
+                console.error('Failed to save gateway override:', error);
+                statusEl.textContent = error.message;
+            });
+        }
+
+        function clearGatewayOverride() {
+            document.getElementById('gatewayInput').value = '';
+            saveGatewayOverride();
+        }
         
         // 加载本机设备信息
         function loadLocalDeviceInfo() {
@@ -854,7 +912,7 @@
                 document.getElementById('localHostname').textContent = data.hostname || '-';
                 document.getElementById('localIP').textContent = data.ip || '-';
                 document.getElementById('localMAC').textContent = data.mac || '-';
-                document.getElementById('localGateway').textContent = data.gateway || '-';
+                renderGatewayInfo(data.gateway, data.gateway_overridden);
                 
                 // 将本机添加到拓扑中
                 addLocalDeviceToTopology();
@@ -878,7 +936,7 @@
                         document.getElementById('localHostname').textContent = data.hostname || 'localhost';
                         document.getElementById('localIP').textContent = data.ip || '127.0.0.1';
                         document.getElementById('localMAC').textContent = data.mac || '-';
-                        document.getElementById('localGateway').textContent = data.gateway || '-';
+                        renderGatewayInfo(data.gateway, data.gateway_overridden);
                         addLocalDeviceToTopology();
                         console.log('从本地存储恢复本机信息成功');
                         return;
@@ -893,6 +951,7 @@
                     ip: '127.0.0.1',
                     mac: null,
                     gateway: null,
+                    gateway_overridden: false,
                     system: 'Unknown',
                     interfaces: []
                 };
@@ -900,7 +959,7 @@
                 document.getElementById('localHostname').textContent = 'localhost';
                 document.getElementById('localIP').textContent = '127.0.0.1';
                 document.getElementById('localMAC').textContent = '-';
-                document.getElementById('localGateway').textContent = '-';
+                renderGatewayInfo(null, false);
                 
                 // 即使获取失败也要添加本机设备
                 addLocalDeviceToTopology();

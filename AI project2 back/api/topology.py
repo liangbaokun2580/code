@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
 import json
 import uuid
+import ipaddress
 
 from models import db, TopologyData, NetworkDevice
 from services.cloud_sync import CloudSyncService
@@ -16,6 +17,8 @@ import netifaces
 topology_bp = Blueprint('topology', __name__)
 cloud_sync = CloudSyncService()
 network_service = NetworkService()
+
+LOCAL_GATEWAY_SESSION_KEY = 'topology_gateway_override'
 
 @topology_bp.route('/ping', methods=['POST'])
 @login_required
@@ -637,6 +640,10 @@ def get_local_device_info():
                 gateway = default_gateway[netifaces.AF_INET][0]
         except:
             gateway = None
+
+        gateway_override = session.get(LOCAL_GATEWAY_SESSION_KEY)
+        if gateway_override:
+            gateway = gateway_override
         
         # 获取MAC地址
         mac_address = None
@@ -751,6 +758,7 @@ def get_local_device_info():
             'ip': local_ip,
             'mac': mac_address,
             'gateway': gateway,
+            'gateway_overridden': bool(gateway_override),
             'system': system_info,
             'interfaces': interfaces
         })
@@ -764,6 +772,45 @@ def get_local_device_info():
             'ip': '127.0.0.1',
             'mac': None,
             'gateway': None,
+            'gateway_overridden': False,
             'system': 'Unknown',
             'interfaces': []
+        }), 500
+
+@topology_bp.route('/local-info/gateway', methods=['PUT'])
+@login_required
+def update_local_gateway():
+    """Update the application-level gateway override for the current session."""
+    try:
+        data = request.get_json() or {}
+        gateway = (data.get('gateway') or '').strip()
+
+        if not gateway:
+            session.pop(LOCAL_GATEWAY_SESSION_KEY, None)
+            session.modified = True
+            return jsonify({
+                'success': True,
+                'gateway': None,
+                'message': 'Gateway override cleared'
+            })
+
+        try:
+            ipaddress.ip_address(gateway)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid gateway address'
+            }), 400
+
+        session[LOCAL_GATEWAY_SESSION_KEY] = gateway
+        session.modified = True
+        return jsonify({
+            'success': True,
+            'gateway': gateway,
+            'message': 'Gateway updated'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500

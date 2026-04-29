@@ -5,8 +5,27 @@ Function Call 结果处理数据配置文件
 存储function_name对应的结果处理数据
 """
 
+from pathlib import Path
 from typing import Dict, Any
 
+
+def _read_write_yaml_script_output() -> str:
+    """Load the YAML snippets returned by Write_YAML_script."""
+    project_root = Path(__file__).resolve().parent.parent / "AI project2 back"
+    yaml_files = [
+        "trusted-repo-template.yaml",
+        "trusted-repo-constraint.yaml",
+        "bad-pod.yaml",
+    ]
+
+    parts = []
+    for filename in yaml_files:
+        yaml_path = project_root / filename
+        content = yaml_path.read_text(encoding="utf-8").rstrip()
+
+        parts.append(f"{filename}\n\n```yaml\n{content}\n```")
+
+    return "\n\n".join(parts)
 
 FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
     "get_weather": {
@@ -242,6 +261,27 @@ FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
                 "message": {
                     "role": "assistant",
                     "content": "配置修改完成，网络问题已修复，请测试网络连接。"
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 20,
+                "total_tokens": 50
+            }
+        }
+    },
+    "Write_YAML_script": {
+        "response": {
+            "id": "chatcmpl-func-default-001",
+            "object": "chat.completion",
+            "created": 1699000000,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": _read_write_yaml_script_output()
                 },
                 "finish_reason": "stop"
             }],

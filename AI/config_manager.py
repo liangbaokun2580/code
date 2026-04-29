@@ -2,48 +2,35 @@
 # -*- coding: utf-8 -*-
 """
 配置管理文件
-管理API服务的基本配置信息
+管理 API 服务的基础配置信息
 """
 
 import time
 import uuid
-from typing import Dict, List, Any, Tuple
+from typing import Any, Dict, List, Tuple
 
 
 class ConfigManager:
     """配置管理器类"""
-    
+
     def __init__(self):
-        """初始化配置管理器"""
         self.api_version = "v1"
         self.model_name = "gpt-3.5-turbo"
         self.max_tokens = 4096
         self.temperature = 0.7
-        
+
     def generate_chat_id(self) -> str:
-        """生成聊天完成ID
-        
-        Returns:
-            str: 生成的聊天ID
-        """
+        """生成聊天完成 ID。"""
         timestamp = int(time.time())
         unique_id = str(uuid.uuid4())[:8]
         return f"chatcmpl-{unique_id}-{timestamp}"
-    
+
     def get_current_timestamp(self) -> int:
-        """获取当前时间戳
-        
-        Returns:
-            int: 当前时间戳
-        """
+        """获取当前时间戳。"""
         return int(time.time())
-    
+
     def get_available_tools(self) -> List[Dict[str, Any]]:
-        """获取可用的工具列表
-        
-        Returns:
-            List[Dict[str, Any]]: 工具列表
-        """
+        """获取可用工具列表。"""
         return [
             {
                 "type": "function",
@@ -72,7 +59,7 @@ class ConfigManager:
                         "properties": {
                             "timezone": {
                                 "type": "string",
-                                "description": "时区，默认为Asia/Shanghai"
+                                "description": "时区，默认 Asia/Shanghai"
                             }
                         },
                         "required": []
@@ -95,27 +82,37 @@ class ConfigManager:
                         "required": ["expression"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "Write_YAML_script",
+                    "description": "输出预置的 YAML 脚本内容",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "include_details": {
+                                "type": "boolean",
+                                "description": "是否返回完整 YAML 内容"
+                            }
+                        },
+                        "required": []
+                    }
+                }
             }
         ]
-    
+
     def validate_request(self, request_data: Dict[str, Any]) -> Tuple[bool, str]:
-        """验证请求数据格式
-        
-        Args:
-            request_data (Dict[str, Any]): 请求数据
-            
-        Returns:
-            Tuple[bool, str]: (是否有效, 错误信息)
-        """
-        required_fields = ['model', 'messages']
+        """验证请求数据格式。"""
+        required_fields = ["model", "messages"]
         for field in required_fields:
             if field not in request_data:
                 return False, f"Missing required field: {field}"
-        
-        if not isinstance(request_data['messages'], list):
+
+        if not isinstance(request_data["messages"], list):
             return False, "Messages must be a list"
-        
-        if len(request_data['messages']) == 0:
+
+        if len(request_data["messages"]) == 0:
             return False, "Messages cannot be empty"
-        
+
         return True, "Valid request"

@@ -1,11 +1,11 @@
-import os
+﻿import os
 from datetime import timedelta
 from config_manager import get_config, set_config, config_manager
 
-# 根据数据库类型设置不同的引擎选项
+# 鏍规嵁鏁版嵁搴撶被鍨嬭缃笉鍚岀殑寮曟搸閫夐」
 def get_sqlalchemy_engine_options(database_uri):
     if database_uri.startswith('sqlite'):
-        # SQLite 配置
+        # SQLite 閰嶇疆
         return {
             'pool_pre_ping': True,
             'pool_recycle': 300,
@@ -16,7 +16,7 @@ def get_sqlalchemy_engine_options(database_uri):
             }
         }
     else:
-        # MySQL/其他数据库配置
+        # MySQL/鍏朵粬鏁版嵁搴撻厤缃?
         return {
             'pool_pre_ping': True,
             'pool_recycle': 300,
@@ -31,10 +31,10 @@ def get_sqlalchemy_engine_options(database_uri):
 
 class Config:
     def __init__(self):
-        # 确保配置管理器已初始化
+        # 纭繚閰嶇疆绠＄悊鍣ㄥ凡鍒濆鍖?
         config_manager.load_config()
     
-    # 基础配置
+    # 鍩虹閰嶇疆
     @property
     def SECRET_KEY(self):
         return os.environ.get('SECRET_KEY') or get_config('security.secret_key', 'your-secret-key-change-in-production')
@@ -43,7 +43,7 @@ class Config:
     def SECRET_KEY(self, value):
         set_config('security.secret_key', value)
     
-    # 数据库配置
+    # 鏁版嵁搴撻厤缃?
     @property
     def SQLALCHEMY_DATABASE_URI(self):
         return os.environ.get('DATABASE_URL') or get_config('database.uri', 'sqlite:///ai_network_system.db')
@@ -66,21 +66,29 @@ class Config:
     def SQLALCHEMY_ENGINE_OPTIONS(self):
         return get_sqlalchemy_engine_options(self.SQLALCHEMY_DATABASE_URI)
     
-    # 会话配置
+    # 浼氳瘽閰嶇疆
     @property
     def PERMANENT_SESSION_LIFETIME(self):
         days = get_config('security.session_lifetime_days', 7)
         return timedelta(days=days)
-    
-    SESSION_COOKIE_SECURE = False  # 在生产环境中设置为True
+
+    @property
+    def REMEMBER_COOKIE_DURATION(self):
+        days = get_config('security.remember_cookie_days', 30)
+        return timedelta(days=days)
+
+    SESSION_COOKIE_SECURE = False  # 鍦ㄧ敓浜х幆澧冧腑璁剧疆涓篢rue
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    REMEMBER_COOKIE_SECURE = SESSION_COOKIE_SECURE
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = SESSION_COOKIE_SAMESITE
     
-    # 文件上传配置
+    # 鏂囦欢涓婁紶閰嶇疆
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
     
-    # AI配置
+    # AI閰嶇疆
     @property
     def OPENAI_API_KEY(self):
         return os.environ.get('OPENAI_API_KEY') or get_config('openai.api_key', 'sk-EtfUdJcMio8tT4BGg0j59qDrAu1ySD8I6T6aQrGD2j0xyBoa')
@@ -145,7 +153,7 @@ class Config:
     def OPENAI_FREQUENCY_PENALTY(self, value):
         set_config('openai.frequency_penalty', float(value))
     
-    # 本地AI模型配置
+    # 鏈湴AI妯″瀷閰嶇疆
     @property
     def USE_LOCAL_MODEL(self):
         env_val = os.environ.get('USE_LOCAL_MODEL', '').lower()
@@ -173,7 +181,7 @@ class Config:
     def LOCAL_MODEL_NAME(self, value):
         set_config('local_model.model_name', value)
     
-    # 网络扫描配置
+    # 缃戠粶鎵弿閰嶇疆
     @property
     def NETWORK_SCAN_TIMEOUT(self):
         return get_config('network.scan_timeout', 30)
@@ -198,7 +206,7 @@ class Config:
     def DEFAULT_SCAN_RANGE(self, value):
         set_config('network.default_scan_range', value)
     
-    # 云端存储配置
+    # 浜戠瀛樺偍閰嶇疆
     @property
     def CLOUD_STORAGE_ENABLED(self):
         return get_config('cloud.storage_enabled', True)
@@ -231,7 +239,7 @@ class Config:
     def CLOUD_STORAGE_API_KEY(self, value):
         set_config('cloud.storage_api_key', value)
     
-    # Redis配置（用于缓存和会话存储）
+    # Redis閰嶇疆锛堢敤浜庣紦瀛樺拰浼氳瘽瀛樺偍锛?
     @property
     def REDIS_URL(self):
         return os.environ.get('REDIS_URL') or get_config('redis.url', 'redis://localhost:6379/0')
@@ -264,10 +272,10 @@ class Config:
     def REDIS_PASSWORD(self, value):
         set_config('redis.password', value)
     
-    # 应用配置
+    # 搴旂敤閰嶇疆
     @property
     def APP_NAME(self):
-        return os.environ.get('APP_NAME') or get_config('app.name', 'AI网络管理系统')
+        return os.environ.get('APP_NAME') or get_config('app.name', 'AI缃戠粶绠＄悊绯荤粺')
     
     @APP_NAME.setter
     def APP_NAME(self, value):
@@ -292,7 +300,7 @@ class Config:
     def DEBUG_MODE(self, value):
         set_config('app.debug_mode', bool(value))
     
-    # 日志配置
+    # 鏃ュ織閰嶇疆
     @property
     def LOG_LEVEL(self):
         return os.environ.get('LOG_LEVEL') or get_config('logging.level', 'INFO')
@@ -303,7 +311,7 @@ class Config:
     
     LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs', 'app.log')
     
-    # 安全配置
+    # 瀹夊叏閰嶇疆
     @property
     def WTF_CSRF_ENABLED(self):
         return get_config('security.csrf_enabled', True)
@@ -314,7 +322,7 @@ class Config:
     
     WTF_CSRF_TIME_LIMIT = None
     
-    # API限流配置
+    # API闄愭祦閰嶇疆
     @property
     def RATELIMIT_STORAGE_URL(self):
         return os.environ.get('REDIS_URL') or get_config('redis.url', 'redis://localhost:6379/1')
@@ -323,12 +331,12 @@ class Config:
     
     @staticmethod
     def init_app(app):
-        # 确保上传目录存在
+        # 纭繚涓婁紶鐩綍瀛樺湪
         upload_folder = app.config['UPLOAD_FOLDER']
         if not os.path.exists(upload_folder):
             os.makedirs(upload_folder)
         
-        # 确保日志目录存在
+        # 纭繚鏃ュ織鐩綍瀛樺湪
         log_dir = os.path.dirname(app.config['LOG_FILE'])
         if not os.path.exists(log_dir):
             os.makedirs(log_dir)

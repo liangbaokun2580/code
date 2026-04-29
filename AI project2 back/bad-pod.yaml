@@ -1,0 +1,9 @@
+# bad-pod.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest          # 违规：使用 Docker Hub 镜像
