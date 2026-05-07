@@ -118,7 +118,12 @@ def create_app():
     @login_required
     def develop():
         return render_template('develop.html')
-        
+
+    @app.route('/remote_test')
+    @login_required
+    def remote_test():
+        return render_template('remote_test.html')
+
     @app.route('/command_line')
     @login_required
     def command_line():

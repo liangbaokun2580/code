@@ -433,6 +433,9 @@
                         <button class="btn btn-warning" id="stopScanBtn" onclick="stopNetworkScan()" style="display: none;">
                             <i class="fas fa-stop me-1"></i>停止扫描
                         </button>
+                        <button class="btn btn-outline-danger" onclick="clearTopologyDiagram()">
+                            <i class="fas fa-trash-alt me-1"></i>清空拓扑
+                        </button>
                     </div>
                     
                     <!-- 扫描进度 -->
@@ -2757,6 +2760,44 @@
         
         function updateTopologyStatus(status) {
             document.getElementById('topologyStatus').textContent = status;
+        }
+
+        async function clearTopologyDiagram() {
+            if (!confirm('确定要清空当前拓扑图吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/topology/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.message || '清空拓扑失败');
+                }
+
+                topologyData = { devices: [], connections: [] };
+                selectedDevice = null;
+
+                if (window.topologyStorage) {
+                    window.topologyStorage.clearTopologyData();
+                } else {
+                    localStorage.removeItem('network_topology_view');
+                }
+
+                drawTopology();
+                updateDeviceList();
+                updateTopologyInfo();
+                updateTopologyStatus('拓扑图已清空');
+            } catch (error) {
+                console.error('清空拓扑失败:', error);
+                updateTopologyStatus('清空拓扑失败: ' + error.message);
+                alert('清空拓扑失败: ' + error.message);
+            }
         }
         
         function selectDevice(deviceId) {

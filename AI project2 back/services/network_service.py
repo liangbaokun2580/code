@@ -404,9 +404,26 @@ class NetworkService:
     def get_hostname(self, ip: str) -> str:
         """获取IP地址的主机名"""
         try:
+            if self.is_windows:
+                result = subprocess.run(
+                    ['nslookup', ip],
+                    capture_output=True,
+                    text=True,
+                    timeout=2
+                )
+                if result.returncode == 0:
+                    for line in result.stdout.splitlines():
+                        stripped = line.strip()
+                        if stripped.lower().startswith('name:'):
+                            return stripped.split(':', 1)[1].strip()
+                return ''
+
             hostname = socket.gethostbyaddr(ip)[0]
             return hostname
-        except (socket.herror, socket.gaierror):
+        except (socket.herror, socket.gaierror, subprocess.TimeoutExpired, FileNotFoundError):
+            return ''
+        except Exception as e:
+            self.logger.debug(f"获取 {ip} 主机名失败: {e}")
             return ''
     
     def get_mac_address(self, ip: str) -> str:
@@ -511,6 +528,39 @@ class NetworkService:
         
         oui = mac_address[:8].lower()
         return oui_vendors.get(oui, '')
+
+    def _build_device_info(self, host: str, scan_type: str, common_ports: List[int]) -> Dict[str, Any]:
+        """构建单个主机的设备信息，避免 full 扫描串行阻塞整个请求。"""
+        device_info = {
+            'device_id': str(uuid.uuid4()),
+            'ip_address': host,
+            'hostname': '',
+            'mac_address': '',
+            'device_type': 'unknown',
+            'vendor': '',
+            'model': '',
+            'status': 'online',
+            'open_ports': [],
+            'discovered_at': datetime.utcnow().isoformat()
+        }
+
+        if scan_type in ['full', 'snmp']:
+            device_info['hostname'] = self.get_hostname(host)
+            device_info['mac_address'] = self.get_mac_address(host)
+
+        if scan_type == 'full':
+            device_info['open_ports'] = self.scan_host_ports(host, common_ports)
+        elif scan_type == 'snmp':
+            device_info['open_ports'] = self.scan_host_ports(host, [161, 162])
+
+        device_info['device_type'] = self.detect_device_type(
+            host, device_info['open_ports'], device_info['hostname']
+        )
+
+        if device_info['mac_address']:
+            device_info['vendor'] = self.detect_vendor(device_info['mac_address'])
+
+        return device_info
     
     def scan_network_range(self, network_range: str) -> List[str]:
         """扫描网络范围内的活跃主机"""
@@ -556,6 +606,23 @@ class NetworkService:
             
             devices = []
             common_ports = [22, 23, 53, 80, 110, 135, 139, 143, 443, 993, 995, 1723, 3389, 5900, 8080]
+
+            if active_hosts:
+                host_workers = min(max(4, self.max_threads // 5), len(active_hosts))
+                with ThreadPoolExecutor(max_workers=host_workers) as executor:
+                    future_to_host = {
+                        executor.submit(self._build_device_info, host, scan_type, common_ports): host
+                        for host in active_hosts
+                    }
+                    for future in as_completed(future_to_host):
+                        host = future_to_host[future]
+                        try:
+                            devices.append(future.result())
+                        except Exception as exc:
+                            self.logger.warning("构建设备信息失败 %s: %s", host, exc)
+
+                devices.sort(key=lambda item: ipaddress.ip_address(item['ip_address']))
+                active_hosts = []
             
             for host in active_hosts:
                 device_info = {

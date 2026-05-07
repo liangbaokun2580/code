@@ -246,6 +246,49 @@ def load_topology_data():
     """加载拓扑数据（与get_topology_data相同，为兼容性保留）"""
     return get_topology_data()
 
+@topology_bp.route('/clear', methods=['POST'])
+@login_required
+def clear_topology_data():
+    """清空当前用户的拓扑图数据"""
+    try:
+        empty_topology = {
+            'devices': [],
+            'connections': []
+        }
+
+        topology = TopologyData.query.filter_by(
+            user_id=current_user.id,
+            is_active=True
+        ).first()
+
+        if topology:
+            topology.topology_data = json.dumps(empty_topology)
+            topology.mode = 'view'
+            topology.updated_at = datetime.utcnow()
+        else:
+            topology = TopologyData(
+                user_id=current_user.id,
+                name='默认拓扑',
+                description='',
+                topology_data=json.dumps(empty_topology),
+                mode='view'
+            )
+            db.session.add(topology)
+
+        db.session.commit()
+        cloud_sync.sync_topology_data(topology, 'update')
+
+        return jsonify({
+            'success': True,
+            'message': '拓扑图已清空',
+            'data': {
+                'topology': topology.to_dict()
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @topology_bp.route('/versions', methods=['GET'])
 @login_required
 def get_topology_versions():
