@@ -211,6 +211,29 @@
     font-variant-ligatures: contextual;
 }
 
+/* CodeMirror 内部测量层与输入法组合层 */
+.CodeMirror-measure,
+.CodeMirror-measure pre,
+.CodeMirror-measure .CodeMirror-line-like,
+.CodeMirror-measure .CodeMirror-linewidget,
+.CodeMirror-measure .CodeMirror-widget {
+    position: absolute !important;
+    visibility: hidden !important;
+    height: auto !important;
+    width: auto !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+.CodeMirror-measure {
+    left: 0 !important;
+    top: 0 !important;
+}
+
+.CodeMirror-composing {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+}
+
 .CodeMirror-gutters {
     background: #2d2d30;
     border-right: 1px solid #3e3e42;
@@ -236,6 +259,8 @@
     z-index: 3;
     background: transparent !important;
     content: '' !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
 
 .CodeMirror-selected {
@@ -279,25 +304,9 @@
     caret-color: transparent !important;
 }
 
-/* 强制清除光标内容 */
-.CodeMirror-cursor {
-    font-size: 0 !important;
-    line-height: 0 !important;
-    overflow: hidden !important;
-}
-
-.CodeMirror-cursor * {
-    display: none !important;
-}
-
-/* 确保光标容器干净 */
-.CodeMirror-cursors * {
-    font-size: inherit;
-    line-height: inherit;
-}
-
-.CodeMirror-cursors .CodeMirror-cursor {
-    font-size: 0 !important;
+/* 保持虚拟光标可见，不覆盖 CodeMirror 自身定位 */
+.CodeMirror-cursors {
+    visibility: visible !important;
 }
 
 /* 确保行高一致性 */
