@@ -32,7 +32,7 @@ def parse_arguments():
     parser.add_argument(
         '--host',
         type=str,
-        default='localhost',
+        default='10.1.50.252',
         help='服务监听地址 (默认: localhost)'
     )
     

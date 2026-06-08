@@ -374,6 +374,28 @@
     padding: 2rem;
 }
 
+.output-line {
+    display: grid;
+    grid-template-columns: 88px 20px minmax(0, 1fr);
+    column-gap: 0.75rem;
+    align-items: start;
+    padding: 0.2rem 0;
+}
+
+.output-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    color: inherit;
+}
+
+.output-content-text {
+    min-width: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* 输出内容样式 */
 .output-success {
     color: #4ec9b0;
@@ -394,6 +416,10 @@
 .output-timestamp {
     color: #808080;
     font-size: 0.8em;
+    white-space: nowrap;
+    text-align: right;
+    user-select: none;
+    padding-top: 1px;
 }
 
 /* 执行状态 */

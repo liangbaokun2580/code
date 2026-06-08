@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional, Generator
 from datetime import datetime
 import asyncio
 import aiohttp
+import requests
 
 from config import Config
 
@@ -24,13 +25,15 @@ class AIService:
         if self.use_local:
             # 使用本地模型
             self.api_key = "ollama"  # Ollama不需要真实API key
-            self.api_base = self.config.LOCAL_MODEL_BASE_URL + "/v1"
+            local_base_url = self.config.LOCAL_MODEL_BASE_URL.rstrip('/')
+            self.api_base = local_base_url if local_base_url.endswith('/v1') else f"{local_base_url}/v1"
             self.model = self.config.LOCAL_MODEL_NAME
             self.logger.info(f"使用本地模型: {self.model} at {self.config.LOCAL_MODEL_BASE_URL}")
         else:
             # 使用OpenAI API
-            self.api_key = self.config.OPENAI_API_KEY
-            self.api_base = self.config.OPENAI_API_BASE + "/v1"
+            self.api_key = (self.config.OPENAI_API_KEY or '').strip()
+            openai_base_url = self.config.OPENAI_API_BASE.rstrip('/')
+            self.api_base = openai_base_url if openai_base_url.endswith('/v1') else f"{openai_base_url}/v1"
             self.model = self.config.OPENAI_MODEL
             self.logger.info(f"使用OpenAI模型: {self.model}")
         
@@ -53,14 +56,22 @@ class AIService:
                 }
             else:
                 # 获取OpenAI API的模型列表
-                models = self.client.models.list()
-                model_list = []
-                for model in models.data:
-                    model_list.append({
-                        "id": model.id,
-                        "name": model.id,
+                response = requests.get(
+                    f"{self.api_base.rstrip('/')}/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"} if self.api_key else {},
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                model_list = [
+                    {
+                        "id": model.get("id"),
+                        "name": model.get("id"),
                         "is_local": False
-                    })
+                    }
+                    for model in data.get("data", [])
+                    if model.get("id")
+                ]
                 return {
                     "success": True,
                     "data": model_list

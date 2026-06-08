@@ -584,7 +584,7 @@ def get_models():
     """获取可用的模型列表"""
     try:
         # 调用AI服务获取模型列表
-        models_response = ai_service.get_available_models()
+        models_response = AIService().get_available_models()
         
         if not models_response.get('success'):
             return jsonify({

@@ -233,9 +233,8 @@ FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
                             'function': {
                                 'name': 'dcn_modify_config',
                                 'arguments': (
-                                    '{"device_ip": "192.168.1.126", '
-                                    '"commands": ["int vlan164","ip address 192.168.7.1 255.255.255.0","exit","interface Ethernet1/0/22","switchport access vlan 164","exit","router ospf 1","network 192.168.7.1 0.0.0.255 area 0","exit","interface Ethernet1/0/7", '
-                                    '"no ip access-group ACL in"]}'
+                                    '{"device_ip": "10.1.50.126", '
+                                    '"commands": ["interface Ethernet1/0/3","no ip access-group ACL in"]}'
                                 )
                             }
                         }

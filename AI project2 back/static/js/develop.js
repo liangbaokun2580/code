@@ -237,7 +237,7 @@ class DevelopmentManager {
         outputDiv.innerHTML = `
             <span class="output-timestamp">[${timestamp}]</span>
             <span class="output-icon"><i class="${iconClass}"></i></span>
-            <span class="output-content">${this.escapeHtml(String(content))}</span>
+            <span class="output-content-text">${this.escapeHtml(String(content))}</span>
         `;
 
         this.outputArea.appendChild(outputDiv);
