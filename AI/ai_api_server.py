@@ -157,6 +157,8 @@ class AIAPIServer:
             or "script" in tool_content
         ):
             return "Write_YAML_script"
+        if "slave1" in tool_call_id or "slave1" in tool_content:
+            return "start_slave1"
         return None
 
     def process_function_result(self, request_data):

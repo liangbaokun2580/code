@@ -27,6 +27,7 @@ def _read_write_yaml_script_output() -> str:
 
     return "\n\n".join(parts)
 
+
 FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
     "get_weather": {
         "response": {
@@ -160,6 +161,27 @@ FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
                 "message": {
                     "role": "assistant",
                     "content": "重启命令已发送，设备正在重启中"
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 20,
+                "total_tokens": 50
+            }
+        }
+    },
+    "start_slave1": {
+        "response": {
+            "id": "chatcmpl-slave1-result-001",
+            "object": "chat.completion",
+            "created": 1699000000,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "slave1启动命令已发送，Slave1正在启动中。"
                 },
                 "finish_reason": "stop"
             }],

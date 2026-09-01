@@ -99,6 +99,23 @@ class ConfigManager:
                         "required": []
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "start_slave1",
+                    "description": "通过SSH连接192.168.1.7启动slave1虚拟机（执行 virsh start s1）",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "input": {
+                                "type": "string",
+                                "description": "请输入：开启slave1"
+                            }
+                        },
+                        "required": ["input"]
+                    }
+                }
             }
         ]
 

@@ -274,14 +274,34 @@ def send_message(session_id):
         })
         print(context)
 
-        # 调用AI服务获取回复
-        ai_response = ai_service.chat_completion(
-            messages=context,
-            use_tools=True,
-            stream=False,
-            model=model,
-            mode=mode
-        )
+        # 确定性触发：输入"开启slave1"→ SSH连接192.168.1.7执行 virsh start s1
+        if "开启slave1" in user_message:
+            ai_response = {
+                'success': True,
+                'response': {
+                    'role': 'assistant',
+                    'content': '正在通过SSH连接192.168.1.7启动slave1虚拟机，请稍候...',
+                    'finish_reason': 'tool_calls',
+                    'tool_calls': [{
+                        'id': f'call_slave1_{uuid.uuid4().hex[:8]}',
+                        'type': 'function',
+                        'function': {
+                            'name': 'start_slave1',
+                            'arguments': json.dumps({'input': '开启slave1'}, ensure_ascii=False)
+                        }
+                    }]
+                },
+                'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            }
+        else:
+            # 调用AI服务获取回复
+            ai_response = ai_service.chat_completion(
+                messages=context,
+                use_tools=True,
+                stream=False,
+                model=model,
+                mode=mode
+            )
 
         # 检查AI服务调用是否成功
         if not ai_response.get('success'):

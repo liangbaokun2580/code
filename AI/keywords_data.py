@@ -165,6 +165,35 @@ KEYWORDS_DATA: Dict[str, Dict[str, Any]] = {
             }
         }
     },
+    "slave1": {
+        "response": {
+            "id": "chatcmpl-slave1-001",
+            "object": "chat.completion",
+            "created": 1699000000,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content":"我将尝试启动Slave1，请稍等。",
+                    "tool_calls": [{
+                        "id": "call_slave1_001",
+                        "type": "function",
+                        "function": {
+                            "name": "start_slave1",
+                            "arguments": '{"input": "开启slave1"}'
+                        }
+                    }]
+                },
+                "finish_reason": "tool_calls"
+            }],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "total_tokens": 30
+            }
+        }
+    },
     "修复": {
         "response": {
             "id": "chatcmpl-default-001",

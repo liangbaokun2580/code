@@ -263,6 +263,23 @@ class AIService:
                         "required": ["target"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "start_slave1",
+                    "description": "通过SSH连接192.168.1.7启动slave1虚拟机（执行 virsh start s1）",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "input": {
+                                "type": "string",
+                                "description": "请输入：开启slave1"
+                            }
+                        },
+                        "required": ["input"]
+                    }
+                }
             }
         ]
         tools = [
@@ -1448,6 +1465,23 @@ class AIService:
                     'message': f'设备 {device.hostname or device.ip_address} 删除成功'
                 }
             
+            elif function_name == 'start_slave1':
+                import os
+                import importlib.util
+                tool_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'tools', 'start_slave1.py'
+                )
+                spec = importlib.util.spec_from_file_location('start_slave1_tool', tool_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                tool_result = module.run(arguments)
+                return {
+                    'success': tool_result.get('success', False),
+                    'result': tool_result.get('data', {}),
+                    'message': tool_result.get('message', '启动slave1命令已执行')
+                }
+
             else:
                 return {
                     'success': False,
