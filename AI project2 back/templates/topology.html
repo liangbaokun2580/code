@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>网络拓扑 - AI网络工程系统</title>
+    <title>网络拓扑 - ANP智能化运维平台</title>
     <link href="/static/vendor/bootstrap/bootstrap.min.css" rel="stylesheet">
     <link href="/static/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
     <link href="/static/css/style.css" rel="stylesheet">
@@ -326,8 +326,8 @@
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="/">
-                <i class="bi bi-diagram-3 me-2"></i>
-                AI网络工程系统
+                <img src="/static/index.png" alt="Logo" class="me-2" style="height: 30px; width: auto;">
+                ANP智能化运维平台
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -338,7 +338,7 @@
                         <a class="nav-link" href="/">首页</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/chat">AI聊天</a>
+                        <a class="nav-link" href="/chat">聊天</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active" href="/topology">网络拓扑</a>
@@ -433,6 +433,9 @@
                         <button class="btn btn-warning" id="stopScanBtn" onclick="stopNetworkScan()" style="display: none;">
                             <i class="fas fa-stop me-1"></i>停止扫描
                         </button>
+                        <button class="btn btn-outline-danger" onclick="clearTopologyDiagram()">
+                            <i class="fas fa-trash-alt me-1"></i>清空拓扑
+                        </button>
                     </div>
                     
                     <!-- 扫描进度 -->
@@ -458,6 +461,15 @@
                                 <div><strong>IP地址:</strong> <span id="localIP">-</span></div>
                                 <div><strong>MAC地址:</strong> <span id="localMAC">-</span></div>
                                 <div><strong>网关:</strong> <span id="localGateway">-</span></div>
+                            </div>
+                            <div class="mt-2">
+                                <label class="form-label form-label-sm mb-1" for="gatewayInput">Gateway Override</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="text" class="form-control" id="gatewayInput" placeholder="192.168.1.1">
+                                    <button class="btn btn-outline-primary" type="button" onclick="saveGatewayOverride()">Save</button>
+                                    <button class="btn btn-outline-secondary" type="button" onclick="clearGatewayOverride()">Clear</button>
+                                </div>
+                                <small class="text-muted d-block mt-1" id="gatewaySaveStatus"></small>
                             </div>
                         </div>
                     </div>
@@ -547,7 +559,7 @@
                             <input type="password" class="form-control form-control-sm" id="devicePassword" placeholder="密码">
                         </div>
                         <div class="d-grid gap-2">
-                            <button class="btn btn-primary btn-sm" onclick="addManualDevice()">
+                            <button class="btn btn-primary btn-sm" id="deviceFormSubmitBtn" onclick="saveDeviceForm()">
                                 <i class="fas fa-plus me-1"></i>添加设备
                             </button>
                             <button class="btn btn-secondary btn-sm" onclick="hideAddDeviceForm()">
@@ -713,6 +725,7 @@
         let ctx = null;
         let currentMode = 'auto';
         let isScanning = false;
+        let scanAbortController = null;
         let selectedDevices = [];
         let viewOffset = { x: 0, y: 0 };
         let zoomLevel = 1;
@@ -721,6 +734,7 @@
         let selectedDevice = null;
         let isDraggingDevice = false;
         let localDeviceInfo = {};
+        let editingDevice = null;
         
         // 设备品牌型号数据
         const deviceModels = {
@@ -833,6 +847,55 @@
         document.addEventListener('DOMContentLoaded', function() {
             initializeTopologyPage();
         });
+
+        function renderGatewayInfo(gateway, overridden = false) {
+            document.getElementById('localGateway').textContent = gateway || '-';
+            document.getElementById('gatewayInput').value = gateway || '';
+            const statusEl = document.getElementById('gatewaySaveStatus');
+            if (!statusEl) return;
+            statusEl.textContent = overridden ? 'Using saved gateway override for this session.' : '';
+        }
+
+        function saveGatewayOverride() {
+            const gateway = document.getElementById('gatewayInput').value.trim();
+            const statusEl = document.getElementById('gatewaySaveStatus');
+            statusEl.textContent = 'Saving...';
+
+            fetch('/api/topology/local-info/gateway', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ gateway })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Failed to save gateway');
+                }
+                if (!localDeviceInfo) {
+                    localDeviceInfo = {};
+                }
+                localDeviceInfo.gateway = data.gateway || null;
+                localDeviceInfo.gateway_overridden = Boolean(data.gateway);
+                renderGatewayInfo(localDeviceInfo.gateway, localDeviceInfo.gateway_overridden);
+                try {
+                    localStorage.setItem('local_device_info', JSON.stringify(localDeviceInfo));
+                } catch (e) {
+                    console.warn('Failed to cache local gateway override', e);
+                }
+                statusEl.textContent = data.message || 'Gateway updated';
+            })
+            .catch(error => {
+                console.error('Failed to save gateway override:', error);
+                statusEl.textContent = error.message;
+            });
+        }
+
+        function clearGatewayOverride() {
+            document.getElementById('gatewayInput').value = '';
+            saveGatewayOverride();
+        }
         
         // 加载本机设备信息
         function loadLocalDeviceInfo() {
@@ -852,7 +915,7 @@
                 document.getElementById('localHostname').textContent = data.hostname || '-';
                 document.getElementById('localIP').textContent = data.ip || '-';
                 document.getElementById('localMAC').textContent = data.mac || '-';
-                document.getElementById('localGateway').textContent = data.gateway || '-';
+                renderGatewayInfo(data.gateway, data.gateway_overridden);
                 
                 // 将本机添加到拓扑中
                 addLocalDeviceToTopology();
@@ -876,7 +939,7 @@
                         document.getElementById('localHostname').textContent = data.hostname || 'localhost';
                         document.getElementById('localIP').textContent = data.ip || '127.0.0.1';
                         document.getElementById('localMAC').textContent = data.mac || '-';
-                        document.getElementById('localGateway').textContent = data.gateway || '-';
+                        renderGatewayInfo(data.gateway, data.gateway_overridden);
                         addLocalDeviceToTopology();
                         console.log('从本地存储恢复本机信息成功');
                         return;
@@ -891,6 +954,7 @@
                     ip: '127.0.0.1',
                     mac: null,
                     gateway: null,
+                    gateway_overridden: false,
                     system: 'Unknown',
                     interfaces: []
                 };
@@ -898,7 +962,7 @@
                 document.getElementById('localHostname').textContent = 'localhost';
                 document.getElementById('localIP').textContent = '127.0.0.1';
                 document.getElementById('localMAC').textContent = '-';
-                document.getElementById('localGateway').textContent = '-';
+                renderGatewayInfo(null, false);
                 
                 // 即使获取失败也要添加本机设备
                 addLocalDeviceToTopology();
@@ -1111,35 +1175,61 @@
             if (isScanning) return;
             
             isScanning = true;
+            scanAbortController = new AbortController();
             document.getElementById('startScanBtn').style.display = 'none';
             document.getElementById('stopScanBtn').style.display = 'block';
             document.getElementById('scanProgress').style.display = 'block';
             
             updateTopologyStatus('正在扫描网络...');
+            updateScanProgress(10, '初始化扫描...');
+
+            let scanRange = '192.168.1.0/24';
+            if (localDeviceInfo && localDeviceInfo.ip) {
+                const ipParts = localDeviceInfo.ip.split('.');
+                if (ipParts.length === 4) {
+                    scanRange = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}.0/24`;
+                }
+            }
             
-            fetch('/api/topology/advanced-scan', {
+            fetch('/api/topology/scan', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
+                signal: scanAbortController.signal,
                 body: JSON.stringify({
+                    scan_range: scanRange,
                     scan_type: 'full',
-                    depth: 3,
-                    concurrency: 50,
-                    timeout: 5
                 })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'started') {
-                    console.log('扫描已开始');
-                } else {
-                    throw new Error(data.message || '启动扫描失败');
+                if (!data.success) {
+                    throw new Error(data.error || data.message || '启动扫描失败');
+                }
+
+                updateScanProgress(90, '处理扫描结果...');
+                handleScanComplete({
+                    topology: {
+                        devices: (data.data && data.data.scan_result && data.data.scan_result.devices) || [],
+                        connections: topologyData.connections || []
+                    }
+                });
+                if (data.warning) {
+                    updateTopologyStatus('扫描完成，但有告警: ' + data.warning);
                 }
             })
             .catch(error => {
+                if (error.name === 'AbortError') {
+                    updateTopologyStatus('扫描已取消');
+                    return;
+                }
                 console.error('扫描启动失败:', error);
-                stopNetworkScan();
+                isScanning = false;
+                scanAbortController = null;
+                document.getElementById('startScanBtn').style.display = 'block';
+                document.getElementById('stopScanBtn').style.display = 'none';
+                document.getElementById('scanProgress').style.display = 'none';
                 updateTopologyStatus('扫描启动失败: ' + error.message);
             });
         }
@@ -1147,22 +1237,17 @@
         // 停止网络扫描
         function stopNetworkScan() {
             if (!isScanning) return;
-            
-            fetch('/api/topology/stop-scan', { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                console.log('扫描已停止');
-            })
-            .catch(error => {
-                console.error('停止扫描失败:', error);
-            })
-            .finally(() => {
-                isScanning = false;
-                document.getElementById('startScanBtn').style.display = 'block';
-                document.getElementById('stopScanBtn').style.display = 'none';
-                document.getElementById('scanProgress').style.display = 'none';
-                updateTopologyStatus('扫描已停止');
-            });
+
+            if (scanAbortController) {
+                scanAbortController.abort();
+            }
+
+            isScanning = false;
+            scanAbortController = null;
+            document.getElementById('startScanBtn').style.display = 'block';
+            document.getElementById('stopScanBtn').style.display = 'none';
+            document.getElementById('scanProgress').style.display = 'none';
+            updateTopologyStatus('扫描已停止');
         }
         
         // 更新扫描进度
@@ -1175,6 +1260,7 @@
         // 处理扫描完成
         function handleScanComplete(data) {
             isScanning = false;
+            scanAbortController = null;
             document.getElementById('startScanBtn').style.display = 'block';
             document.getElementById('stopScanBtn').style.display = 'none';
             document.getElementById('scanProgress').style.display = 'none';
@@ -1595,11 +1681,11 @@
             
             // 填充编辑表单
             const device = contextMenuDevice;
+            editingDevice = device;
             document.getElementById('deviceName').value = device.name || '';
-            document.getElementById('deviceIP').value = device.ip || '';
-            document.getElementById('deviceMAC').value = device.mac || '';
+            document.getElementById('deviceIP').value = device.ip || device.ip_address || '';
             document.getElementById('deviceType').value = device.device_type || device.type || 'pc';
-            document.getElementById('deviceBrand').value = device.brand || 'cisco';
+            document.getElementById('deviceBrand').value = device.brand || '';
             updateModelOptions();
             document.getElementById('deviceModel').value = device.model || '';
             
@@ -1618,8 +1704,15 @@
             document.getElementById('deviceUsername').value = username;
             document.getElementById('devicePassword').value = password;
             
-            // 显示添加设备表单
-            showAddDeviceForm();
+            // 显示编辑表单
+            const formTitle = document.getElementById('formTitle');
+            const submitBtn = document.getElementById('deviceFormSubmitBtn');
+            formTitle.textContent = '编辑设备';
+            submitBtn.innerHTML = '<i class="fas fa-save me-1"></i>保存修改';
+            document.getElementById('deviceForm').style.display = 'block';
+            if (currentMode !== 'manual') {
+                switchMode('manual');
+            }
             
             hideContextMenu();
         }
@@ -1807,6 +1900,8 @@
                     'dcn': [
                         { name: 'Ethernet1/1', description: '以太网接口 1/1' },
                         { name: 'Ethernet1/2', description: '以太网接口 1/2' },
+                        { name: 'Ethernet1/3', description: '以太网接口 1/3' },
+                        { name: 'Ethernet1/4', description: '以太网接口 1/4' },
                         { name: 'GigabitEthernet1/1', description: '千兆以太网接口 1/1' },
                         { name: 'GigabitEthernet1/2', description: '千兆以太网接口 1/2' }
                     ]
@@ -2037,8 +2132,10 @@
         
         // 手动设备管理
         function showAddDeviceForm(deviceType) {
-            document.getElementById('deviceType').value = deviceType;
-            document.getElementById('formTitle').textContent = '添加' + getDeviceTypeName(deviceType);
+            editingDevice = null;
+            document.getElementById('deviceType').value = deviceType || 'pc';
+            document.getElementById('formTitle').textContent = '添加' + getDeviceTypeName(deviceType || 'pc');
+            document.getElementById('deviceFormSubmitBtn').innerHTML = '<i class="fas fa-plus me-1"></i>添加设备';
             document.getElementById('deviceForm').style.display = 'block';
             
             // 清空表单
@@ -2046,7 +2143,8 @@
             document.getElementById('deviceIP').value = '';
             document.getElementById('deviceBrand').value = '';
             document.getElementById('deviceModel').value = '';
-            document.getElementById('deviceInterfaces').value = '';
+            document.getElementById('deviceUsername').value = '';
+            document.getElementById('devicePassword').value = '';
             
             updateModelOptions();
         }
@@ -2082,10 +2180,11 @@
         }
         
         function hideAddDeviceForm() {
+            editingDevice = null;
             document.getElementById('deviceForm').style.display = 'none';
         }
         
-        function addManualDevice() {
+        function saveDeviceForm() {
             const name = document.getElementById('deviceName').value.trim();
             const ip = document.getElementById('deviceIP').value.trim();
             const type = document.getElementById('deviceType').value;
@@ -2107,21 +2206,51 @@
                     password: password
                 });
             }
-            
-            const device = {
-                id: 'manual_' + Date.now(),
-                name: name,
-                ip: ip,
-                device_type: type,
-                brand: brand,
-                model: model,
-                status: 'unknown',
-                credentials: credentials,
-                x: 100 + ((topologyData.devices ? topologyData.devices.length : 0) % 6) * 120,
-                y: 100 + Math.floor((topologyData.devices ? topologyData.devices.length : 0) / 6) * 120
-            };
-            
-            topologyData.devices.push(device);
+
+            if (!topologyData.devices) {
+                topologyData.devices = [];
+            }
+
+            const duplicateDevice = topologyData.devices.find(device =>
+                device !== editingDevice && (device.ip === ip || device.ip_address === ip)
+            );
+            if (duplicateDevice) {
+                alert('该IP地址对应的设备已存在');
+                return;
+            }
+
+            const wasEditing = !!editingDevice;
+
+            if (editingDevice) {
+                editingDevice.name = name;
+                editingDevice.hostname = name;
+                editingDevice.ip = ip;
+                editingDevice.ip_address = ip;
+                editingDevice.device_type = type;
+                editingDevice.type = type;
+                editingDevice.brand = brand;
+                editingDevice.model = model;
+                editingDevice.credentials = credentials;
+                editingDevice.updated_at = new Date().toISOString();
+            } else {
+                const device = {
+                    id: 'manual_' + Date.now(),
+                    name: name,
+                    hostname: name,
+                    ip: ip,
+                    ip_address: ip,
+                    device_type: type,
+                    type: type,
+                    brand: brand,
+                    model: model,
+                    status: 'unknown',
+                    credentials: credentials,
+                    x: 100 + ((topologyData.devices ? topologyData.devices.length : 0) % 6) * 120,
+                    y: 100 + Math.floor((topologyData.devices ? topologyData.devices.length : 0) / 6) * 120
+                };
+                topologyData.devices.push(device);
+            }
+
             drawTopology();
             updateDeviceList();
             updateTopologyInfo();
@@ -2132,13 +2261,11 @@
                 window.topologyStorage.saveTopologyDataManually(topologyData, currentMode);
             }
             
-            updateTopologyStatus('已添加设备: ' + name);
-            
-            // 如果有SSH凭据，显示提示
+            const actionText = wasEditing ? '已更新设备: ' : '已添加设备: ';
             if (credentials) {
-                updateTopologyStatus('已添加设备: ' + name + ' (SSH凭据已保存)');
+                updateTopologyStatus(actionText + name + ' (SSH凭据已保存)');
             } else {
-                updateTopologyStatus('已添加设备: ' + name);
+                updateTopologyStatus(actionText + name);
             }
         }
         
@@ -2634,6 +2761,44 @@
         function updateTopologyStatus(status) {
             document.getElementById('topologyStatus').textContent = status;
         }
+
+        async function clearTopologyDiagram() {
+            if (!confirm('确定要清空当前拓扑图吗？')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/topology/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || result.message || '清空拓扑失败');
+                }
+
+                topologyData = { devices: [], connections: [] };
+                selectedDevice = null;
+
+                if (window.topologyStorage) {
+                    window.topologyStorage.clearTopologyData();
+                } else {
+                    localStorage.removeItem('network_topology_view');
+                }
+
+                drawTopology();
+                updateDeviceList();
+                updateTopologyInfo();
+                updateTopologyStatus('拓扑图已清空');
+            } catch (error) {
+                console.error('清空拓扑失败:', error);
+                updateTopologyStatus('清空拓扑失败: ' + error.message);
+                alert('清空拓扑失败: ' + error.message);
+            }
+        }
         
         function selectDevice(deviceId) {
             // 设备选择逻辑
@@ -3019,9 +3184,28 @@
             if (!data || typeof data !== 'object') {
                 return { devices: [], connections: [] };
             }
+
+            const devices = Array.isArray(data.devices) ? data.devices.map((device, index) => {
+                const normalizedIp = device.ip || device.ip_address || '';
+                const normalizedName = device.name || device.hostname || normalizedIp || 'Unknown';
+                const fallbackId = normalizedIp || `device_${index}`;
+                return {
+                    ...device,
+                    id: device.id || device.device_id || fallbackId,
+                    device_id: device.device_id || device.id || fallbackId,
+                    ip: normalizedIp,
+                    ip_address: device.ip_address || normalizedIp,
+                    name: normalizedName,
+                    hostname: device.hostname || normalizedName,
+                    mac: device.mac || device.mac_address || '',
+                    mac_address: device.mac_address || device.mac || '',
+                    type: device.type || device.device_type || 'unknown',
+                    device_type: device.device_type || device.type || 'unknown'
+                };
+            }) : [];
             
             return {
-                devices: Array.isArray(data.devices) ? data.devices : [],
+                devices: devices,
                 connections: Array.isArray(data.connections) ? data.connections : []
             };
         }

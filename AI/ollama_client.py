@@ -10,8 +10,16 @@ import json
 import time
 from typing import Dict, List, Any, Optional
 
+
 class OllamaClient:
+    """Ollama API 客户端类"""
+    
     def __init__(self, base_url: str = "http://192.168.1.7:31143"):
+        """初始化 Ollama 客户端
+        
+        Args:
+            base_url (str): Ollama 服务的基础URL
+        """
         self.base_url = base_url.rstrip('/')
         self.session = requests.Session()
         self.session.headers.update({
@@ -19,7 +27,11 @@ class OllamaClient:
         })
     
     def is_available(self) -> bool:
-        """检查 Ollama 服务是否可用"""
+        """检查 Ollama 服务是否可用
+        
+        Returns:
+            bool: 服务是否可用
+        """
         try:
             response = self.session.get(f"{self.base_url}/api/tags", timeout=5)
             return response.status_code == 200
@@ -27,7 +39,11 @@ class OllamaClient:
             return False
     
     def list_models(self) -> List[Dict[str, Any]]:
-        """获取可用模型列表"""
+        """获取可用模型列表
+        
+        Returns:
+            List[Dict[str, Any]]: 模型列表
+        """
         try:
             response = self.session.get(f"{self.base_url}/api/tags")
             response.raise_for_status()
@@ -37,9 +53,27 @@ class OllamaClient:
             print(f"获取模型列表失败: {e}")
             return []
     
-    def chat_completion(self, model: str, messages: List[Dict[str, str]], 
-                       stream: bool = False, **kwargs) -> Dict[str, Any]:
-        """发送聊天完成请求到 Ollama"""
+    def chat_completion(
+        self, 
+        model: str, 
+        messages: List[Dict[str, str]], 
+        stream: bool = False, 
+        **kwargs
+    ) -> Dict[str, Any]:
+        """发送聊天完成请求到 Ollama
+        
+        Args:
+            model (str): 模型名称
+            messages (List[Dict[str, str]]): 消息列表
+            stream (bool): 是否使用流式响应
+            **kwargs: 其他参数
+            
+        Returns:
+            Dict[str, Any]: Ollama 响应
+            
+        Raises:
+            Exception: 请求失败时抛出异常
+        """
         # 转换消息格式
         ollama_messages = self._convert_messages_to_ollama(messages)
         
@@ -74,8 +108,18 @@ class OllamaClient:
         except Exception as e:
             raise Exception(f"Ollama 请求失败: {e}")
     
-    def _convert_messages_to_ollama(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """将 OpenAI 格式的消息转换为 Ollama 格式"""
+    def _convert_messages_to_ollama(
+        self, 
+        messages: List[Dict[str, str]]
+    ) -> List[Dict[str, str]]:
+        """将 OpenAI 格式的消息转换为 Ollama 格式
+        
+        Args:
+            messages (List[Dict[str, str]]): OpenAI 格式消息
+            
+        Returns:
+            List[Dict[str, str]]: Ollama 格式消息
+        """
         ollama_messages = []
         
         for msg in messages:
@@ -97,8 +141,15 @@ class OllamaClient:
         
         return ollama_messages
     
-    def _handle_stream_response(self, response):
-        """处理流式响应"""
+    def _handle_stream_response(self, response) -> Dict[str, Any]:
+        """处理流式响应
+        
+        Args:
+            response: HTTP 响应对象
+            
+        Returns:
+            Dict[str, Any]: 处理后的响应数据
+        """
         # 简化处理，返回最后一个完整响应
         last_response = None
         for line in response.iter_lines():
@@ -110,9 +161,22 @@ class OllamaClient:
                     continue
         return last_response or {}
     
-    def convert_to_openai_format(self, ollama_response: Dict[str, Any], 
-                                model: str, request_id: str) -> Dict[str, Any]:
-        """将 Ollama 响应转换为 OpenAI 格式"""
+    def convert_to_openai_format(
+        self, 
+        ollama_response: Dict[str, Any], 
+        model: str, 
+        request_id: str
+    ) -> Dict[str, Any]:
+        """将 Ollama 响应转换为 OpenAI 格式
+        
+        Args:
+            ollama_response (Dict[str, Any]): Ollama 响应
+            model (str): 模型名称
+            request_id (str): 请求ID
+            
+        Returns:
+            Dict[str, Any]: OpenAI 格式响应
+        """
         message = ollama_response.get('message', {})
         content = message.get('content', '')
         
@@ -133,7 +197,9 @@ class OllamaClient:
                         "role": "assistant",
                         "content": content
                     },
-                    "finish_reason": "stop" if ollama_response.get('done', False) else "length"
+                    "finish_reason": (
+                        "stop" if ollama_response.get('done', False) else "length"
+                    )
                 }
             ],
             "usage": {
@@ -146,7 +212,14 @@ class OllamaClient:
         return openai_response
     
     def get_model_info(self, model_name: str) -> Optional[Dict[str, Any]]:
-        """获取特定模型信息"""
+        """获取特定模型信息
+        
+        Args:
+            model_name (str): 模型名称
+            
+        Returns:
+            Optional[Dict[str, Any]]: 模型信息，失败时返回None
+        """
         try:
             response = self.session.post(
                 f"{self.base_url}/api/show",

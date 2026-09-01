@@ -1,0 +1,21 @@
+# trusted-repo-constraint.yaml
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: TrustedImageRepository
+metadata:
+  name: require-trusted-image-repo
+spec:
+  enforcementAction: deny          # deny: 强制执行
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+      - apiGroups: ["batch"]
+        kinds: ["Job", "CronJob"]
+    excludedNamespaces:            # 排除系统命名空间
+      - "kube-system"
+      - "gatekeeper-system"
+      - "local-path-storage"
+  parameters:
+    trustedPrefix: "harbor.company.com/"   # 修改为你的可信镜像仓库地址

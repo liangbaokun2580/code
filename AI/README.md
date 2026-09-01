@@ -1,395 +1,266 @@
-# AI API 服务 - Ollama 兼容层
+# AI API 服务
 
-一个符合 OpenAI API 规范的 AI 聊天服务，支持两种运行模式：
-1. **if...else 模式**：基于关键词匹配的预定义响应，支持 Function Call
-2. **Ollama 模式**：集成 Ollama 本地大语言模型的智能对话
+一个兼容 OpenAI API 格式的智能 API 服务，支持双模式运行：关键词匹配的 if...else 模式和 Ollama 本地大模型模式。
 
 ## 功能特性
 
-- ✅ 符合 OpenAI Chat Completions API 规范
-- ✅ **双模式支持**：if...else 关键词模式 + Ollama 本地模型模式
-- ✅ **动态模式切换**：运行时无缝切换模式
-- ✅ **Ollama 兼容层**：自动转换 OpenAI 格式到 Ollama 格式
-- ✅ Function Call 支持（if...else 模式）
-- ✅ 模块化数据存储（关键词和 Function Call 数据分离）
-- ✅ 完整的错误处理和服务可用性检查
-- ✅ 健康检查和监控端点
-- ✅ 配置管理和持久化
+### 🔄 双模式支持
+- **if...else 模式**：基于关键词匹配的快速响应模式
+- **Ollama 模式**：集成本地大语言模型的智能对话模式
+- **动态切换**：支持运行时模式切换，无需重启服务
+
+### 🛠️ Function Call 支持
+- 天气查询 (`get_weather`)
+- 时间获取 (`get_current_time`)
+- 数学计算 (`calculate`)
+- 网络信息 (`get_network_info`)
+- 设备重启 (`device_reboot`)
+- 网络状态 (`get_network_status`)
+- DCN 配置管理 (`dcn_get_config`, `dcn_modify_config`)
+
+### 📡 OpenAI 兼容 API
+- 完全兼容 OpenAI Chat Completions API
+- 支持流式和非流式响应
+- 支持 tools/function calling
+- 标准的错误处理和响应格式
 
 ## 项目结构
 
 ```
-AI/
-├── ai_api_server.py      # 主 API 服务器（集成双模式支持）
-├── ollama_client.py      # Ollama 客户端和兼容层
-├── mode_manager.py       # 模式管理器
-├── keywords_data.py      # 关键词响应数据
-├── function_calls.py     # Function Call 结果数据
-├── config_manager.py     # 配置管理
-├── test_client.py        # 基础测试客户端
-├── test_ollama_client.py # Ollama 兼容层测试客户端
-├── requirements.txt      # 项目依赖
-├── mode_config.json      # 模式配置文件（自动生成）
-└── README.md            # 项目说明
+build/
+├── ai_api_server.py          # 主服务器文件
+├── config_manager.py         # 配置管理器
+├── mode_manager.py           # 模式管理器
+├── ollama_client.py          # Ollama 客户端
+├── keywords_data.py          # 关键词数据
+├── function_calls.py         # Function Call 数据
+├── test_client.py            # API 测试客户端
+├── test_ollama_client.py     # Ollama 兼容性测试
+├── ollama_config.json        # Ollama 配置文件
+├── requirements.txt          # Python 依赖
+└── README.md                 # 项目文档
 ```
 
 ## 安装和运行
 
-### 1. 安装依赖
+### 1. 环境准备
 
 ```bash
+# 创建虚拟环境（推荐）
+python -m venv venv
+
+# 激活虚拟环境
+# Windows
+venv\Scripts\activate
+# Linux/macOS
+source venv/bin/activate
+
+# 安装依赖
 pip install -r requirements.txt
 ```
 
-### 2. 启动服务
+### 2. 配置设置
 
-```bash
-python ai_api_server.py
-```
-
-服务将在 `http://localhost:5000` 启动。
-
-### 3. 运行测试
-
-```bash
-python test_client.py
-```
-
-## API 端点
-
-### 核心聊天 API
-
-**POST** `/v1/chat/completions`
-
-符合 OpenAI Chat Completions API 规范的聊天接口，根据当前模式自动路由到对应的处理逻辑。
-
-### 模式管理 API
-
-**GET** `/v1/mode` - 获取当前模式信息
-**POST** `/v1/mode/switch` - 切换运行模式
-**GET** `/v1/mode/config` - 获取模式配置
-**POST** `/v1/mode/config` - 更新模式配置
-
-#### 请求示例
+编辑 `ollama_config.json` 文件，配置 Ollama 服务：
 
 ```json
 {
-  "model": "gpt-3.5-turbo",
-  "messages": [
-    {
-      "role": "user",
-      "content": "请帮我查询北京的天气"
-    }
-  ]
-}
-```
-
-#### 响应示例（Function Call）
-
-```json
-{
-  "id": "chatcmpl-abc123",
-  "object": "chat.completion",
-  "created": 1699000000,
-  "model": "gpt-3.5-turbo",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": null,
-        "tool_calls": [
-          {
-            "id": "call_weather_001",
-            "type": "function",
-            "function": {
-              "name": "get_weather",
-              "arguments": "{\"location\": \"北京\"}"
-            }
-          }
-        ]
-      },
-      "finish_reason": "tool_calls"
-    }
-  ],
-  "usage": {
-    "prompt_tokens": 20,
-    "completion_tokens": 15,
-    "total_tokens": 35
+  "base_url": "http://localhost:11434",
+  "default_model": "llama2",
+  "temperature": 0.7,
+  "max_tokens": 2048,
+  "timeout": 30,
+  "model_mapping": {
+    "gpt-3.5-turbo": "llama2",
+    "gpt-4": "llama2:13b",
+    "gpt-4-turbo": "mistral"
   }
 }
 ```
 
-### 其他端点
-
-- **GET** `/v1/models` - 获取可用模型列表
-- **GET** `/v1/tools` - 获取可用工具列表
-- **GET** `/health` - 健康检查（包含模式状态）
-
-## 双模式详细说明
-
-### if...else 模式
-
-基于关键词匹配的预定义响应模式，使用 if...else 逻辑进行关键词匹配：
-
-| 关键词 | 触发条件 | Function Call |
-|--------|----------|---------------|
-| 天气 | "天气", "weather" | `get_weather` |
-| 时间 | "时间", "time", "现在几点" | `get_current_time` |
-| 计算 | "计算", "算", "数学", "calculate" | `calculate` |
-| 默认 | 其他所有情况 | 无 |
-
-### Ollama 模式
-
-集成 Ollama 本地大语言模型，提供真正的 AI 对话能力：
-
-- **自动格式转换**：OpenAI 请求格式 ↔ Ollama 请求格式
-- **模型映射**：将 OpenAI 模型名称映射到本地 Ollama 模型
-- **参数传递**：支持 temperature、max_tokens 等参数
-- **错误处理**：自动检测 Ollama 服务可用性
-- **流式响应**：支持 Ollama 的流式输出（可选）
-
-## 模式切换
-
-### 切换到指定模式
+### 3. 启动服务
 
 ```bash
-curl -X POST http://localhost:5000/v1/mode/switch \
-  -H "Content-Type: application/json" \
-  -d '{"mode": "ollama"}'
+# 启动 AI API 服务
+python ai_api_server.py
+
+# 服务将在 http://localhost:5000 启动
 ```
 
-### 自动切换模式
+### 4. 安装 Ollama（可选）
+
+如果要使用 Ollama 模式，需要先安装 Ollama：
 
 ```bash
-curl -X POST http://localhost:5000/v1/mode/switch
+# 下载并安装 Ollama
+# 访问 https://ollama.ai 获取安装包
+
+# 拉取模型
+ollama pull llama2
+ollama pull mistral
 ```
 
-### 获取当前模式信息
+## API 使用
+
+### 聊天 API
 
 ```bash
-curl http://localhost:5000/v1/mode
-```
-
-### 更新 Ollama 配置
-
-```bash
-curl -X POST http://localhost:5000/v1/mode/config \
+curl -X POST http://localhost:5000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "ollama_config": {
-      "base_url": "http://localhost:11434",
-      "default_model": "llama2:latest",
-      "temperature": 0.8
-    }
+    "model": "gpt-3.5-turbo",
+    "messages": [
+      {"role": "user", "content": "你好"}
+    ]
   }'
 ```
 
-## Function Call 工作流程（if...else 模式）
-
-1. **用户发送包含关键词的消息**
-   ```json
-   {
-     "model": "gpt-3.5-turbo",
-     "messages": [
-       {"role": "user", "content": "请查询北京天气"}
-     ]
-   }
-   ```
-
-2. **服务返回 Function Call 请求**
-   ```json
-   {
-     "choices": [{
-       "message": {
-         "role": "assistant",
-         "tool_calls": [{
-           "function": {"name": "get_weather"}
-         }]
-       }
-     }]
-   }
-   ```
-
-3. **客户端执行 Function 并返回结果**
-   ```json
-   {
-     "model": "gpt-3.5-turbo",
-     "messages": [
-       {"role": "user", "content": "请查询北京天气"},
-       {"role": "assistant", "tool_calls": [...]},
-       {
-         "role": "tool",
-         "tool_call_id": "call_weather_001",
-         "name": "get_weather",
-         "content": "{\"temperature\": \"25°C\"}"
-       }
-     ]
-   }
-   ```
-
-4. **服务返回最终响应**
-   ```json
-   {
-     "choices": [{
-       "message": {
-         "role": "assistant",
-         "content": "根据天气数据，今天北京天气晴朗..."
-       }
-     }]
-   }
-   ```
-
-## 数据配置
-
-### 关键词数据 (`keywords_data.py`)
-
-存储关键词对应的响应数据，包括 Function Call 定义。
-
-### Function Call 结果 (`function_calls.py`)
-
-存储 Function Call 执行后的响应数据，根据 `function_name` 进行匹配。
-
-## 使用示例
-
-### if...else 模式测试
+### 模式管理 API
 
 ```bash
-# 运行基础测试客户端
-python test_client.py
+# 获取当前模式
+curl http://localhost:5000/v1/mode
+
+# 切换模式
+curl -X POST http://localhost:5000/v1/mode \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "ollama"}'
+
+# 获取模式配置
+curl http://localhost:5000/v1/mode/config
+
+# 重新加载配置
+curl -X POST http://localhost:5000/v1/mode/reload
 ```
 
-### Ollama 模式测试
+### 其他 API
 
 ```bash
-# 运行 Ollama 兼容层测试客户端
+# 获取模型列表
+curl http://localhost:5000/v1/models
+
+# 获取工具列表
+curl http://localhost:5000/v1/tools
+
+# 健康检查
+curl http://localhost:5000/health
+```
+
+## 测试
+
+### 基础功能测试
+
+```bash
+# 运行基础 API 测试
+python test_client.py
+
+# 运行 Ollama 兼容性测试
 python test_ollama_client.py
 ```
 
-### 手动测试模式切换
+### Function Call 测试
 
 ```python
-import requests
+# 天气查询示例
+messages = [
+    {"role": "user", "content": "北京今天天气怎么样？"}
+]
 
-# 切换到 Ollama 模式
-response = requests.post('http://localhost:5000/v1/mode/switch', 
-                        json={'mode': 'ollama'})
-print(response.json())
+# 时间查询示例
+messages = [
+    {"role": "user", "content": "现在几点了？"}
+]
 
-# 发送聊天请求（将使用 Ollama）
-chat_response = requests.post('http://localhost:5000/v1/chat/completions',
-                             json={
-                                 'model': 'gpt-3.5-turbo',
-                                 'messages': [{'role': 'user', 'content': '你好'}]
-                             })
-print(chat_response.json())
+# 计算示例
+messages = [
+    {"role": "user", "content": "帮我计算 2+2"}
+]
 ```
 
-## 自定义扩展
+## 配置说明
 
-### 添加新关键词（if...else 模式）
+### Ollama 配置
 
-在 `keywords_data.py` 中添加新的关键词和响应：
+- `base_url`: Ollama 服务地址
+- `default_model`: 默认使用的模型
+- `temperature`: 生成温度（0-1）
+- `max_tokens`: 最大生成长度
+- `timeout`: 请求超时时间（秒）
+- `model_mapping`: OpenAI 模型到 Ollama 模型的映射
+
+### 模式说明
+
+1. **if...else 模式**
+   - 基于关键词匹配
+   - 响应速度快
+   - 适合固定场景
+   - 支持预定义的 Function Call
+
+2. **Ollama 模式**
+   - 使用本地大语言模型
+   - 智能对话能力
+   - 需要 Ollama 服务支持
+   - 支持多种开源模型
+
+## 开发指南
+
+### 添加新的 Function Call
+
+1. 在 `function_calls.py` 中添加新的函数定义
+2. 在 `keywords_data.py` 中添加对应的关键词映射
+3. 在 `config_manager.py` 中注册新的工具
+
+### 自定义关键词响应
+
+编辑 `keywords_data.py` 文件，添加新的关键词和响应：
 
 ```python
 KEYWORDS_DATA = {
     "新关键词": {
-        "keywords": ["关键词1", "关键词2"],
-        "response": {
-            # OpenAI 格式响应
-        }
+        "response": "自定义响应内容",
+        "tool_calls": [...]  # 可选的工具调用
     }
 }
 ```
 
-### 添加新 Function Call（if...else 模式）
+## 故障排除
 
-1. 在 `config_manager.py` 中添加工具定义
-2. 在 `function_calls.py` 中添加结果数据
-3. 在 `keywords_data.py` 中关联关键词
+### 常见问题
 
-### 配置 Ollama 模型
+1. **Ollama 连接失败**
+   - 检查 Ollama 服务是否启动
+   - 验证 `ollama_config.json` 中的 URL 配置
+   - 确认防火墙设置
 
-```bash
-# 拉取新模型
-ollama pull llama2:13b
+2. **模型不存在**
+   - 使用 `ollama list` 查看已安装模型
+   - 使用 `ollama pull <model>` 下载所需模型
 
-# 更新默认模型配置
-curl -X POST http://localhost:5000/v1/mode/config \
-  -H "Content-Type: application/json" \
-  -d '{"ollama_config": {"default_model": "llama2:13b"}}'
-```
+3. **端口冲突**
+   - 修改 `ai_api_server.py` 中的端口配置
+   - 检查端口是否被其他服务占用
 
-## 错误处理
+### 日志调试
 
-### 通用错误
-
-- **400 Bad Request**: 请求格式错误
-- **500 Internal Server Error**: 服务器内部错误
-- **404 Not Found**: 端点不存在
-
-### Ollama 特定错误
-
-- **503 Service Unavailable**: Ollama 服务不可用
-- **404 Model Not Found**: 指定的模型不存在
-- **408 Request Timeout**: Ollama 请求超时
-
-所有错误都会返回标准的 JSON 格式：
-
-```json
-{
-  "error": {
-    "message": "错误描述",
-    "type": "错误类型",
-    "code": "错误代码",
-    "mode": "当前模式"
-  }
-}
-```
-
-## 注意事项
-
-### Ollama 模式要求
-
-1. **Ollama 服务必须运行**：确保 Ollama 在 `http://localhost:11434` 运行
-2. **模型已下载**：使用 `ollama pull <model_name>` 下载所需模型
-3. **网络连接**：确保服务器可以访问 Ollama API
-
-### 性能考虑
-
-- **if...else 模式**：响应速度极快，适合简单交互
-- **Ollama 模式**：响应时间取决于模型大小和硬件性能
-- **模式切换**：无需重启服务，但建议在低负载时进行
-
-## 开发调试
-
-### 启用调试模式
-
-```python
-app.run(host='0.0.0.0', port=5000, debug=True)
-```
-
-### 查看日志
-
-服务会输出详细的请求和响应日志，便于调试。包括：
-- 当前运行模式
-- Ollama 服务状态
-- 请求路由信息
-- 错误详情
-
-启动服务时会显示所有可用端点：
-
-```
-Starting AI API Server...
-Available endpoints:
-  POST /v1/chat/completions - Chat completions
-  GET  /v1/models - List models
-  GET  /v1/tools - List tools
-  GET  /health - Health check
-
-Server running on http://localhost:5000
-```
+服务启动时会显示详细的日志信息，包括：
+- 模式切换状态
+- Ollama 连接状态
+- 请求处理过程
+- 错误信息
 
 ## 许可证
 
-本项目仅供学习和演示使用。
+本项目采用 MIT 许可证。
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request 来改进这个项目。
+
+## 更新日志
+
+### v1.0.0
+- 初始版本发布
+- 支持双模式运行
+- 完整的 OpenAI API 兼容性
+- Function Call 支持
+- 完善的测试套件

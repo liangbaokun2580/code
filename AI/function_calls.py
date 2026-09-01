@@ -1,7 +1,34 @@
-# Function Call 结果处理数据配置文件
-# 存储function_name对应的结果处理数据
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Function Call 结果处理数据配置文件
+存储function_name对应的结果处理数据
+"""
 
-FUNCTION_RESULTS = {
+from pathlib import Path
+from typing import Dict, Any
+
+
+def _read_write_yaml_script_output() -> str:
+    """Load the YAML snippets returned by Write_YAML_script."""
+    project_root = Path(__file__).resolve().parent.parent / "AI project2 back"
+    yaml_files = [
+        "trusted-repo-template.yaml",
+        "trusted-repo-constraint.yaml",
+        "bad-pod.yaml",
+    ]
+
+    parts = []
+    for filename in yaml_files:
+        yaml_path = project_root / filename
+        content = yaml_path.read_text(encoding="utf-8").rstrip()
+
+        parts.append(f"{filename}\n\n```yaml\n{content}\n```")
+
+    return "\n\n".join(parts)
+
+
+FUNCTION_RESULTS: Dict[str, Dict[str, Any]] = {
     "get_weather": {
         "response": {
             "id": "chatcmpl-weather-result-001",
@@ -12,7 +39,10 @@ FUNCTION_RESULTS = {
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": "根据天气数据，今天北京天气晴朗，温度25°C，湿度60%，风速5km/h。适合外出活动。"
+                    "content": (
+                        "根据天气数据，今天北京天气晴朗，温度25°C，"
+                        "湿度60%，风速5km/h。适合外出活动。"
+                    )
                 },
                 "finish_reason": "stop"
             }],
@@ -101,10 +131,12 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5Z2EECSTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'device_reboot',
-                                'arguments': '{"device_ip":"192.168.1.1|192.168.1.126", "device_brand": "dcn"}'
+                                'arguments': (
+                                    '{"device_ip":"192.168.1.11|192.168.1.126", '
+                                    '"device_brand": "dcn"}'
+                                )
                             }
                         }
                     ]
@@ -139,6 +171,27 @@ FUNCTION_RESULTS = {
             }
         }
     },
+    "start_slave1": {
+        "response": {
+            "id": "chatcmpl-slave1-result-001",
+            "object": "chat.completion",
+            "created": 1699000000,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": "slave1启动命令已发送，Slave1正在启动中。"
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 20,
+                "total_tokens": 50
+            }
+        }
+    },
     "get_network_status": {
         "response": {
             "id": "chatcmpl-func-default-001",
@@ -154,19 +207,23 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5ZSEECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_get_config',
-                                'arguments': '{"device_ip": "192.168.1.1", "config_type": "running"}'
+                                'arguments': (
+                                    '{"device_ip": "192.168.1.11", '
+                                    '"config_type": "running"}'
+                                )
                             }
                         },
                         {
                             'id': 'call_5ZSEECDTNVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_get_config',
-                                'arguments': '{"device_ip": "192.168.1.126", "config_type": "running"}'
+                                'arguments': (
+                                    '{"device_ip": "192.168.1.126", '
+                                    '"config_type": "running"}'
+                                )
                             }
                         }
                     ]
@@ -195,10 +252,12 @@ FUNCTION_RESULTS = {
                         {
                             'id': 'call_5aSEECDTdVeEI52jhdhZvIxT',
                             'type': 'function',
-                            'function':
-                            {
+                            'function': {
                                 'name': 'dcn_modify_config',
-                                'arguments': '{"device_ip": "192.168.1.1", "config_type": "interface", "commands": ["int e1/0/2", "switchport access vlan 2"]}'
+                                'arguments': (
+                                    '{"device_ip": "10.1.50.126", '
+                                    '"commands": ["interface Ethernet1/0/3","no ip access-group ACL in"]}'
+                                )
                             }
                         }
                     ]
@@ -222,7 +281,28 @@ FUNCTION_RESULTS = {
                 "index": 0,
                 "message": {
                     "role": "assistant",
-                    "content": "配置修改完成，现在设备已经可以正常连接路由器，如果还有问题，请联系技术支持。"
+                    "content": "配置修改完成，网络问题已修复，请测试网络连接。"
+                },
+                "finish_reason": "stop"
+            }],
+            "usage": {
+                "prompt_tokens": 30,
+                "completion_tokens": 20,
+                "total_tokens": 50
+            }
+        }
+    },
+    "Write_YAML_script": {
+        "response": {
+            "id": "chatcmpl-func-default-001",
+            "object": "chat.completion",
+            "created": 1699000000,
+            "model": "gpt-3.5-turbo",
+            "choices": [{
+                "index": 0,
+                "message": {
+                    "role": "assistant",
+                    "content": _read_write_yaml_script_output()
                 },
                 "finish_reason": "stop"
             }],

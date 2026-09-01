@@ -22,16 +22,8 @@ from api.webssh import webssh_bp
 from api.settings import settings_bp
 from models import db, User, ChatSession, TopologyData, NetworkDevice
 from config import Config
-from utils.database_utils import db_manager, handle_database_error
+from utils.database_utils import db_manager, handle_database_error, is_database_corruption_error
 import logging
-import sys
-
-# Avoid GBK encoding crashes on Windows console output
-try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-except Exception:
-    pass
 
 def create_app():
     app = Flask(__name__)
@@ -72,7 +64,11 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_exception(e):
         # 检查是否是数据库错误
-        if 'sqlite3.OperationalError' in str(type(e)) or 'disk I/O error' in str(e):
+        if (
+            'sqlite3.OperationalError' in str(type(e)) or
+            'disk I/O error' in str(e) or
+            is_database_corruption_error(e)
+        ):
             error_info = handle_database_error(e)
             logging.error(f"数据库错误: {error_info}")
             
@@ -122,7 +118,11 @@ def create_app():
     @login_required
     def develop():
         return render_template('develop.html')
-        
+
+    @app.route('/remote_test')
+    def remote_test():
+        return render_template('remote_test.html')
+
     @app.route('/command_line')
     @login_required
     def command_line():

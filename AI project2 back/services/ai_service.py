@@ -1,11 +1,11 @@
 from openai import OpenAI
-import re
 import json
 import logging
 from typing import Dict, List, Any, Optional, Generator
 from datetime import datetime
 import asyncio
 import aiohttp
+import requests
 
 from config import Config
 
@@ -25,13 +25,15 @@ class AIService:
         if self.use_local:
             # 使用本地模型
             self.api_key = "ollama"  # Ollama不需要真实API key
-            self.api_base = self.config.LOCAL_MODEL_BASE_URL + "/v1"
+            local_base_url = self.config.LOCAL_MODEL_BASE_URL.rstrip('/')
+            self.api_base = local_base_url if local_base_url.endswith('/v1') else f"{local_base_url}/v1"
             self.model = self.config.LOCAL_MODEL_NAME
             self.logger.info(f"使用本地模型: {self.model} at {self.config.LOCAL_MODEL_BASE_URL}")
         else:
             # 使用OpenAI API
-            self.api_key = self.config.OPENAI_API_KEY
-            self.api_base = self.config.OPENAI_API_BASE + "/v1"
+            self.api_key = (self.config.OPENAI_API_KEY or '').strip()
+            openai_base_url = self.config.OPENAI_API_BASE.rstrip('/')
+            self.api_base = openai_base_url if openai_base_url.endswith('/v1') else f"{openai_base_url}/v1"
             self.model = self.config.OPENAI_MODEL
             self.logger.info(f"使用OpenAI模型: {self.model}")
         
@@ -54,14 +56,22 @@ class AIService:
                 }
             else:
                 # 获取OpenAI API的模型列表
-                models = self.client.models.list()
-                model_list = []
-                for model in models.data:
-                    model_list.append({
-                        "id": model.id,
-                        "name": model.id,
+                response = requests.get(
+                    f"{self.api_base.rstrip('/')}/models",
+                    headers={"Authorization": f"Bearer {self.api_key}"} if self.api_key else {},
+                    timeout=10
+                )
+                response.raise_for_status()
+                data = response.json()
+                model_list = [
+                    {
+                        "id": model.get("id"),
+                        "name": model.get("id"),
                         "is_local": False
-                    })
+                    }
+                    for model in data.get("data", [])
+                    if model.get("id")
+                ]
                 return {
                     "success": True,
                     "data": model_list
@@ -98,33 +108,6 @@ class AIService:
             formatted_messages.append(formatted_msg)
         
         return formatted_messages
-
-    def _has_chinese(self, text: str) -> bool:
-        if not text:
-            return False
-        return re.search(r'[\u4e00-\u9fff]', text) is not None
-
-    def _translate_to_chinese(self, text: str) -> str:
-        """Translate text to Chinese using the current model."""
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {'role': 'system', 'content': '你是翻译器，只输出中文译文，不要解释。'},
-                    {'role': 'user', 'content': text}
-                ],
-                max_tokens=min(self.max_tokens, 1024),
-                temperature=0
-            )
-            translated = response.choices[0].message.content or ''
-            return translated.strip() if translated else text
-        except Exception:
-            return text
-
-    def ensure_chinese(self, text: str) -> str:
-        if self._has_chinese(text):
-            return text
-        return self._translate_to_chinese(text)
     
     def _get_available_tools(self, mode: str) -> List[Dict[str, Any]]:
         """获取可用的工具定义"""
@@ -278,6 +261,23 @@ class AIService:
                             }
                         },
                         "required": ["target"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "start_slave1",
+                    "description": "通过SSH连接192.168.1.7启动slave1虚拟机（执行 virsh start s1）",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "input": {
+                                "type": "string",
+                                "description": "请输入：开启slave1"
+                            }
+                        },
+                        "required": ["input"]
                     }
                 }
             }
@@ -799,14 +799,9 @@ class AIService:
                        use_tools: bool = True, 
                        stream: bool = False,
                        model = None,
-                       mode = 'chat',
-                       force_chinese_retry: bool = True) -> Dict[str, Any]:
+                       mode = 'chat') -> Dict[str, Any]:
         """发送聊天完成请求"""
         try:
-            # Local Ollama models may not support tools
-            if self.use_local:
-                use_tools = False
-
             formatted_messages = self._prepare_messages(messages, mode)
             
             # 构建请求参数
@@ -833,17 +828,7 @@ class AIService:
                 return self._stream_chat_completion(request_params)
             else:
                 response = self.client.chat.completions.create(**request_params)
-                result = self._process_response(response)
-
-                # If the reply has no CJK characters, retry once with a hard Chinese instruction
-                if force_chinese_retry:
-                    content = (result.get('response') or {}).get('content', '') or ''
-                    if content and not self._has_chinese(content):
-                        # Translate instead of retrying to avoid repeated English
-                        translated = self.ensure_chinese(content)
-                        result['response']['content'] = translated
-
-                return result
+                return self._process_response(response)
                 
         except Exception as e:
             self.logger.error(f"AI聊天请求失败: {e}")
@@ -1480,6 +1465,23 @@ class AIService:
                     'message': f'设备 {device.hostname or device.ip_address} 删除成功'
                 }
             
+            elif function_name == 'start_slave1':
+                import os
+                import importlib.util
+                tool_path = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'tools', 'start_slave1.py'
+                )
+                spec = importlib.util.spec_from_file_location('start_slave1_tool', tool_path)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                tool_result = module.run(arguments)
+                return {
+                    'success': tool_result.get('success', False),
+                    'result': tool_result.get('data', {}),
+                    'message': tool_result.get('message', '启动slave1命令已执行')
+                }
+
             else:
                 return {
                     'success': False,
@@ -1582,19 +1584,16 @@ class AIService:
             # print(messages)
             
             # 调用AI生成响应
-            request_params = {
-                'model': self.model if model is None else model,
-                'messages': messages,
-                'max_tokens': self.max_tokens,
-                'temperature': self.temperature,
-                'top_p': self.top_p,
-                'presence_penalty': self.presence_penalty,
-                'frequency_penalty': self.frequency_penalty
-            }
-            if not self.use_local:
-                request_params['tools'] = self._get_available_tools(mode)
-
-            response = self.client.chat.completions.create(**request_params)
+            response = self.client.chat.completions.create(
+                model=self.model if model is None else model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                presence_penalty=self.presence_penalty,
+                frequency_penalty=self.frequency_penalty,
+                tools=self._get_available_tools(mode)
+            )
             
             # 处理AI响应
             ai_response = self._process_response(response)
@@ -1618,9 +1617,6 @@ class AIService:
         """生成系统提示词"""
         base_prompt = """
 你是一个面向非专业用户的网络管理助手。用户可能不理解专业术语（如IP、子网掩码、交换机、路由协议等），请务必遵守以下规则：
-
-### 输出语言要求
-**所有回复必须使用中文**，不要输出英文或混合中英文。
 
 ### 核心工作原则
 1. **术语解释优先**：当涉及专业概念时，先用通俗语言解释（例如："IP地址相当于设备的门牌号"）

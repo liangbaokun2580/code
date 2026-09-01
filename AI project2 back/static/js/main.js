@@ -193,14 +193,7 @@ class ApiClient {
         };
         
         try {
-            // Normalize URL to avoid relative-path 404s when running under /chat
-            let requestUrl = url;
-            if (!/^https?:\/\//i.test(requestUrl)) {
-                const normalizedUrl = requestUrl.startsWith('/') ? requestUrl : `/${requestUrl}`;
-                const base = AppConfig.apiBaseUrl ? AppConfig.apiBaseUrl.replace(/\/$/, '') : '';
-                requestUrl = base ? base + normalizedUrl : normalizedUrl;
-            }
-            const response = await fetch(requestUrl, config);
+            const response = await fetch(AppConfig.apiBaseUrl + url, config);
             
             // 处理401未授权错误
             if (response.status === 401) {
@@ -209,28 +202,21 @@ class ApiClient {
                 throw new Error('认证失败，请重新登录');
             }
             
-            let data = null;
-            try {
-                data = await response.json();
-            } catch (e) {
-                // Non-JSON response
-            }
-
             if (!response.ok) {
-                const msg = (data && (data.error || data.message))
-                    ? (data.error || data.message)
-                    : `HTTP error! status: ${response.status}`;
-                const err = new Error(msg);
-                err.status = response.status;
-                err.response = data;
-                throw err;
+                let errorMessage = `HTTP error! status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorData.message || errorMessage;
+                } catch (e) {
+                    // Keep the HTTP status fallback message when response is not JSON.
+                }
+                throw new Error(errorMessage);
             }
             
-            if (data && data.success === false) {
-                const err = new Error(data.error || '请求失败');
-                err.status = response.status;
-                err.response = data;
-                throw err;
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.error || '请求失败');
             }
             
             return data;

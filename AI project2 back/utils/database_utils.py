@@ -15,6 +15,16 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
+def is_database_corruption_error(error) -> bool:
+    """判断是否为SQLite数据库损坏错误。"""
+    error_msg = str(error).lower()
+    return (
+        'database disk image is malformed' in error_msg or
+        'malformed' in error_msg or
+        'file is not a database' in error_msg
+    )
+
+
 def safe_create_or_update(db, model_class, filter_kwargs, update_kwargs=None, create_kwargs=None):
     """
     安全地创建或更新数据库记录，处理唯一性约束冲突
@@ -185,6 +195,9 @@ def retry_db_operation(max_retries=3, delay=1):
                         if attempt < max_retries - 1:
                             time.sleep(delay * (attempt + 1))  # 递增延迟
                             continue
+                    elif is_database_corruption_error(e):
+                        logger.error(f"检测到数据库损坏，停止重试: {e}")
+                        raise
                     else:
                         # 非I/O错误，直接抛出
                         raise
@@ -288,6 +301,17 @@ def handle_database_error(error):
                 '等待其他操作完成',
                 '检查是否有其他应用实例在运行',
                 '重启应用程序'
+            ]
+        }
+    elif is_database_corruption_error(error):
+        return {
+            'error_type': 'corruption_error',
+            'message': 'SQLite数据库文件已损坏，需要恢复或重建数据库',
+            'suggestions': [
+                '先备份当前的 .db/.db-wal/.db-shm 文件',
+                '使用 sqlite3 的 .recover 恢复到新数据库文件',
+                '如果没有可恢复内容，则重新创建数据库',
+                '恢复后重启应用程序'
             ]
         }
     elif 'no such table' in error_msg:

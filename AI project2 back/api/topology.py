@@ -1,8 +1,9 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
 import json
 import uuid
+import ipaddress
 
 from models import db, TopologyData, NetworkDevice
 from services.cloud_sync import CloudSyncService
@@ -16,6 +17,8 @@ import netifaces
 topology_bp = Blueprint('topology', __name__)
 cloud_sync = CloudSyncService()
 network_service = NetworkService()
+
+LOCAL_GATEWAY_SESSION_KEY = 'topology_gateway_override'
 
 @topology_bp.route('/ping', methods=['POST'])
 @login_required
@@ -243,6 +246,49 @@ def load_topology_data():
     """加载拓扑数据（与get_topology_data相同，为兼容性保留）"""
     return get_topology_data()
 
+@topology_bp.route('/clear', methods=['POST'])
+@login_required
+def clear_topology_data():
+    """清空当前用户的拓扑图数据"""
+    try:
+        empty_topology = {
+            'devices': [],
+            'connections': []
+        }
+
+        topology = TopologyData.query.filter_by(
+            user_id=current_user.id,
+            is_active=True
+        ).first()
+
+        if topology:
+            topology.topology_data = json.dumps(empty_topology)
+            topology.mode = 'view'
+            topology.updated_at = datetime.utcnow()
+        else:
+            topology = TopologyData(
+                user_id=current_user.id,
+                name='默认拓扑',
+                description='',
+                topology_data=json.dumps(empty_topology),
+                mode='view'
+            )
+            db.session.add(topology)
+
+        db.session.commit()
+        cloud_sync.sync_topology_data(topology, 'update')
+
+        return jsonify({
+            'success': True,
+            'message': '拓扑图已清空',
+            'data': {
+                'topology': topology.to_dict()
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @topology_bp.route('/versions', methods=['GET'])
 @login_required
 def get_topology_versions():
@@ -308,47 +354,72 @@ def scan_network():
             scan_type=scan_type,
             user_id=current_user.id
         )
+
+        if scan_result.get('error'):
+            return jsonify({
+                'success': False,
+                'error': scan_result.get('error'),
+                'data': {
+                    'scan_result': scan_result,
+                    'devices_saved': 0
+                }
+            }), 500
         
         # 保存扫描到的设备
         devices_saved = 0
-        for device_info in scan_result.get('devices', []):
-            device = NetworkDevice.query.filter_by(
-                user_id=current_user.id,
-                ip_address=device_info['ip_address']
-            ).first()
-            
-            if device:
-                # 更新现有设备
-                device.hostname = device_info.get('hostname', device.hostname)
-                device.device_type = device_info.get('device_type', device.device_type)
-                device.vendor = device_info.get('vendor', device.vendor)
-                device.model = device_info.get('model', device.model)
-                device.mac_address = device_info.get('mac_address', device.mac_address)
-                device.status = device_info.get('status', 'unknown')
-                device.last_seen = datetime.utcnow()
-                device.updated_at = datetime.utcnow()
-            else:
-                # 创建新设备
-                device = NetworkDevice(
+        persistence_error = None
+        try:
+            for device_info in scan_result.get('devices', []):
+                ip_address = device_info.get('ip_address') or device_info.get('ip')
+                if not ip_address:
+                    continue
+
+                device = NetworkDevice.query.filter_by(
                     user_id=current_user.id,
-                    device_id=device_info.get('device_id', str(uuid.uuid4())),
-                    hostname=device_info.get('hostname', ''),
-                    ip_address=device_info['ip_address'],
-                    device_type=device_info.get('device_type', 'unknown'),
-                    vendor=device_info.get('vendor', ''),
-                    model=device_info.get('model', ''),
-                    mac_address=device_info.get('mac_address', ''),
-                    status=device_info.get('status', 'unknown'),
-                    last_seen=datetime.utcnow()
-                )
-                db.session.add(device)
+                    ip_address=ip_address
+                ).first()
+                
+                if device:
+                    # 更新现有设备
+                    device.hostname = device_info.get('hostname', device.hostname)
+                    device.device_type = device_info.get('device_type', device.device_type)
+                    device.vendor = device_info.get('vendor', device.vendor)
+                    device.model = device_info.get('model', device.model)
+                    device.mac_address = device_info.get('mac_address', device.mac_address)
+                    device.status = device_info.get('status', 'unknown')
+                    device.last_seen = datetime.utcnow()
+                    device.updated_at = datetime.utcnow()
+                else:
+                    # 创建新设备
+                    device = NetworkDevice(
+                        user_id=current_user.id,
+                        device_id=device_info.get('device_id', str(uuid.uuid4())),
+                        hostname=device_info.get('hostname', ''),
+                        ip_address=ip_address,
+                        device_type=device_info.get('device_type', 'unknown'),
+                        vendor=device_info.get('vendor', ''),
+                        model=device_info.get('model', ''),
+                        mac_address=device_info.get('mac_address', ''),
+                        status=device_info.get('status', 'unknown'),
+                        last_seen=datetime.utcnow()
+                    )
+                    db.session.add(device)
+                
+                devices_saved += 1
             
-            devices_saved += 1
-        
-        db.session.commit()
-        
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            persistence_error = f'保存扫描结果失败: {str(db_error)}'
+
         # 异步同步到云端
-        cloud_sync.sync_network_scan_result(scan_result, current_user.id)
+        try:
+            cloud_sync.sync_network_scan_result(scan_result, current_user.id)
+        except Exception as sync_error:
+            if persistence_error:
+                persistence_error = f'{persistence_error}; 云同步失败: {str(sync_error)}'
+            else:
+                persistence_error = f'云同步失败: {str(sync_error)}'
         
         return jsonify({
             'success': True,
@@ -356,7 +427,8 @@ def scan_network():
             'data': {
                 'scan_result': scan_result,
                 'devices_saved': devices_saved
-            }
+            },
+            'warning': persistence_error
         })
         
     except Exception as e:
@@ -611,6 +683,10 @@ def get_local_device_info():
                 gateway = default_gateway[netifaces.AF_INET][0]
         except:
             gateway = None
+
+        gateway_override = session.get(LOCAL_GATEWAY_SESSION_KEY)
+        if gateway_override:
+            gateway = gateway_override
         
         # 获取MAC地址
         mac_address = None
@@ -725,6 +801,7 @@ def get_local_device_info():
             'ip': local_ip,
             'mac': mac_address,
             'gateway': gateway,
+            'gateway_overridden': bool(gateway_override),
             'system': system_info,
             'interfaces': interfaces
         })
@@ -738,6 +815,45 @@ def get_local_device_info():
             'ip': '127.0.0.1',
             'mac': None,
             'gateway': None,
+            'gateway_overridden': False,
             'system': 'Unknown',
             'interfaces': []
+        }), 500
+
+@topology_bp.route('/local-info/gateway', methods=['PUT'])
+@login_required
+def update_local_gateway():
+    """Update the application-level gateway override for the current session."""
+    try:
+        data = request.get_json() or {}
+        gateway = (data.get('gateway') or '').strip()
+
+        if not gateway:
+            session.pop(LOCAL_GATEWAY_SESSION_KEY, None)
+            session.modified = True
+            return jsonify({
+                'success': True,
+                'gateway': None,
+                'message': 'Gateway override cleared'
+            })
+
+        try:
+            ipaddress.ip_address(gateway)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid gateway address'
+            }), 400
+
+        session[LOCAL_GATEWAY_SESSION_KEY] = gateway
+        session.modified = True
+        return jsonify({
+            'success': True,
+            'gateway': gateway,
+            'message': 'Gateway updated'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
         }), 500

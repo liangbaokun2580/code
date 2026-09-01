@@ -1,11 +1,4 @@
-﻿// 聊天页面JavaScript文件
-
-function isSessionNotFoundError(error) {
-    if (!error) return false;
-    if (error.status === 404) return true;
-    const msg = error.message || '';
-    return msg.includes('会话不存在') || msg.includes('status: 404');
-}
+// 聊天页面JavaScript文件
 
 class ChatManager {
     constructor() {
@@ -108,7 +101,7 @@ class ChatManager {
                     }
                 }
             } catch (error) {
-                if (isSessionNotFoundError(error)) {
+                if (error.message && error.message.includes('会话不存在')) {
                     console.log('会话不存在，创建新会话');
                     const created = await this.createNewSession();
                     if (created) {
@@ -329,158 +322,51 @@ class ChatManager {
                     timestamp: msg.timestamp
                 }));
             
-            // 发送消息到后端（流式输出）
-            const requestBody = {
-                message: message,
-                mode: this.currentMode,
-                model: this.currentModel,
-                chat_history: chatHistory,
-                stream: true,
-                context: {
-                    user_preferences: this.getUserPreferences(),
-                    timestamp: new Date().toISOString()
-                }
-            };
-
-            const buildUrl = (path) => {
-                const normalized = path.startsWith('/') ? path : `/${path}`;
-                const base = AppConfig.apiBaseUrl ? AppConfig.apiBaseUrl.replace(/\/$/, '') : '';
-                return base ? base + normalized : normalized;
-            };
-
-            let streamMsg = null;
-
-            const doNonStream = async () => {
-                const response = await ApiClient.post(`/api/chat/sessions/${this.getSessionId()}/messages`, {
+            // 发送消息到后端（使用标准AI请求JSON格式）
+            let response;
+            try {
+                response = await ApiClient.post(`/api/chat/sessions/${this.getSessionId()}/messages`, {
                     message: message,
                     mode: this.currentMode,
-                    model: this.currentModel,
+                    model: this.currentModel, // 添加模型参数
                     chat_history: chatHistory,
                     context: {
                         user_preferences: this.getUserPreferences(),
                         timestamp: new Date().toISOString()
                     }
                 });
-
-                this.hideTypingIndicator();
-
-                const aiMessage = response.data.ai_message;
-                this.addMessage('assistant', aiMessage.content, aiMessage.tool_calls, aiMessage.choice);
-                if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
-                    await this.executeToolCalls(aiMessage.tool_calls);
-                }
-            };
-
-            const doStream = async () => {
-                const token = ApiClient.getAuthToken();
-                const headers = { 'Content-Type': 'application/json' };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const response = await fetch(
-                    buildUrl(`/api/chat/sessions/${this.getSessionId()}/messages`),
-                    {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify(requestBody)
-                    }
-                );
-
-                if (response.status === 401) {
-                    ApiClient.removeAuthToken();
-                    window.location.href = '/login';
-                    throw new Error('认证失败，请重新登录');
-                }
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                streamMsg = this.addStreamingAssistantMessage();
-                let fullContent = '';
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder('utf-8');
-                let buffer = '';
-
-                while (true) {
-                    const { value, done } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop();
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed) continue;
-                        let obj;
-                        try {
-                            obj = JSON.parse(trimmed);
-                        } catch (e) {
-                            continue;
-                        }
-                        if (obj.delta) {
-                            fullContent += obj.delta;
-                            streamMsg.textEl.textContent = fullContent;
-                            this.scrollToBottom();
-                        }
-                        if (obj.final) {
-                            fullContent = obj.final;
-                            streamMsg.textEl.innerHTML = this.formatMessageContent(fullContent || '');
-                            this.scrollToBottom();
-                        }
-                        if (obj.done) {
-                            break;
-                        }
-                        if (obj.success === false) {
-                            throw new Error(obj.error || '流式输出失败');
-                        }
-                    }
-                }
-
-                // 完成后格式化显示
-                streamMsg.textEl.innerHTML = this.formatMessageContent(fullContent || '');
-                this.hideTypingIndicator();
-
-                // 保存到历史记录
-                const messageData = {
-                    type: 'assistant',
-                    content: fullContent || '',
-                    timestamp: streamMsg.timestamp,
-                    toolCalls: null,
-                    choice: {},
-                    toolStatus: {}
-                };
-                this.messageHistory.push(messageData);
-                this.updateSessionDisplay();
-
-                if (this.cloudSyncEnabled && this.messageHistory.length > 1) {
-                    this.saveChatToCloud();
-                }
-            };
-
-            try {
-                await doStream();
             } catch (error) {
-                if (isSessionNotFoundError(error)) {
+                // 如果会话不存在，先创建会话再重试
+                if (error.message && error.message.includes('会话不存在')) {
                     console.log('会话不存在，创建新会话后重试');
                     const created = await this.createNewSession();
                     if (!created) {
                         throw new Error('无法创建新会话，请检查网络连接');
                     }
-                    await doStream();
-                    return;
+                    response = await ApiClient.post(`/api/chat/sessions/${this.getSessionId()}/messages`, {
+                        message: message,
+                        mode: this.currentMode,
+                        chat_history: chatHistory,
+                        context: {
+                            user_preferences: this.getUserPreferences(),
+                            timestamp: new Date().toISOString()
+                        }
+                    });
+                } else {
+                    throw error;
                 }
+            }
+            
+            // 隐藏打字指示器
+            this.hideTypingIndicator();
+            this.hideToolExecutionModal();
 
-                const msg = (error && error.message) ? error.message : '';
-                const isStreamError = msg.includes('incomplete chunked read') || msg.includes('peer closed connection');
-                if (isStreamError) {
-                    // remove partial streaming bubble
-                    if (streamMsg && streamMsg.messageDiv) {
-                        streamMsg.messageDiv.remove();
-                    }
-                    await doNonStream();
-                    return;
-                }
-
-                throw error;
+            const aiMessage = response.data.ai_message;
+            
+            this.addMessage('assistant', aiMessage.content, aiMessage.tool_calls, aiMessage.choice);
+            // 如果有工具调用，执行工具
+            if (aiMessage.tool_calls && aiMessage.tool_calls.length > 0) {
+                await this.executeToolCalls(aiMessage.tool_calls);
             }
 
         } catch (error) {
@@ -550,28 +436,6 @@ class ChatManager {
         if (this.cloudSyncEnabled && this.messageHistory.length > 1 && is_upload) { // 跳过欢迎消息
             this.saveChatToCloud();
         }
-    }
-
-    addStreamingAssistantMessage() {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message assistant';
-
-        const timestamp = new Date().toISOString();
-        messageDiv.innerHTML = `
-            <div class="message-avatar">
-                <i class="bi bi-robot"></i>
-            </div>
-            <div class="message-content">
-                <div class="message-text"></div>
-                <div class="message-time">${Utils.formatTime(timestamp)}</div>
-            </div>
-        `;
-
-        this.chatMessages.appendChild(messageDiv);
-        this.scrollToBottom();
-
-        const textEl = messageDiv.querySelector('.message-text');
-        return { messageDiv, textEl, timestamp };
     }
     
     addSystemMessage(content) {
@@ -699,7 +563,8 @@ class ChatManager {
     async executeToolCalls(toolCalls) {
         const toolResults = [];
         
-        for (const toolCall of toolCalls) {
+        try {
+            for (const toolCall of toolCalls) {
             try {
                 // 处理不同的工具调用结构
                 const toolName = toolCall.name || (toolCall.function && toolCall.function.name);
@@ -792,9 +657,11 @@ class ChatManager {
         }
         
         // 隐藏工具执行模态框
-        this.hideToolExecutionModal();
         
         // 将工具执行结果发送给AI进行处理
+        } finally {
+            this.hideToolExecutionModal();
+        }
         await this.sendToolResultsToAI(toolResults);
     }
     
@@ -1085,6 +952,7 @@ class ChatManager {
     
     async sendToolResultsToAI(toolResults) {
         try {
+            this.hideToolExecutionModal();
             // 显示AI处理工具结果的指示器
             this.showTypingIndicator();
 
@@ -1136,6 +1004,8 @@ class ChatManager {
             this.hideTypingIndicator();
             this.addMessage('error', `处理工具结果失败: ${error.message}`);
             Utils.showNotification('处理工具结果失败', 'error');
+        } finally {
+            this.hideToolExecutionModal();
         }
     }
 
@@ -1270,7 +1140,7 @@ class ChatManager {
             </div>
             <div class="message-content">
                 <div class="typing-indicator">
-                    <span class="typing-text">AI正在思考</span>
+                    <span class="typing-text">思考中</span>
                     <div class="typing-dots">
                         <div class="typing-dot"></div>
                         <div class="typing-dot"></div>
@@ -1413,7 +1283,7 @@ class ChatManager {
                 this.messageHistory = [];
                 
                 // 添加欢迎消息
-                this.addMessage('assistant', '您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
+                this.addMessage('assistant', '您好！我是ANP智能化运维平台工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
                 
                 // 加载历史消息
                 response.data.messages.forEach(msg => {
@@ -1428,21 +1298,21 @@ class ChatManager {
                 // 没有历史消息，只显示欢迎消息
                 this.chatMessages.innerHTML = '';
                 this.messageHistory = [];
-                this.addMessage('assistant', '您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
+                this.addMessage('assistant', '您好！我是ANP智能化运维平台工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
             }
             
         } catch (error) {
             console.error('加载聊天历史失败:', error);
             
             // 如果是会话不存在的错误，创建新会话
-            if (isSessionNotFoundError(error)) {
+            if (error.message && error.message.includes('会话不存在')) {
                 console.log('会话不存在，创建新会话');
                 const created = await this.createNewSession();
                 if (!created) {
                     // 创建失败，显示默认欢迎消息
                     this.chatMessages.innerHTML = '';
                     this.messageHistory = [];
-                    this.addMessage('assistant', '您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
+                    this.addMessage('assistant', '您好！我是ANP智能化运维平台工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
                 }
                 return;
             }
@@ -1450,7 +1320,7 @@ class ChatManager {
             // 其他错误，显示默认欢迎消息
             this.chatMessages.innerHTML = '';
             this.messageHistory = [];
-            this.addMessage('assistant', '您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
+            this.addMessage('assistant', '您好！我是ANP智能化运维平台工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？', null, {}, false);
         }
     }
     
@@ -1980,7 +1850,7 @@ ChatManager.prototype.saveChatToCloud = async function() {
             await ApiClient.put(`/api/chat/sessions/${this.getSessionId()}`, chatData);
         } catch (error) {
             // 如果会话不存在，先创建会话再重试
-             if (isSessionNotFoundError(error)) {
+             if (error.message && error.message.includes('会话不存在')) {
                  console.log('会话不存在，创建新会话后重试保存');
                  const created = await this.createNewSession();
                  if (!created) {
@@ -2008,7 +1878,7 @@ ChatManager.prototype.syncChatToServer = async function(chatData) {
             });
         } catch (error) {
             // 如果会话不存在，先创建会话再重试
-             if (isSessionNotFoundError(error)) {
+             if (error.message && error.message.includes('会话不存在')) {
                  console.log('会话不存在，创建新会话后重试同步');
                  const created = await this.createNewSession();
                  if (!created) {
@@ -2052,7 +1922,7 @@ ChatManager.prototype.loadChatFromServer = async function() {
         return null;
     } catch (error) {
         // 如果会话不存在，尝试创建新会话
-        if (isSessionNotFoundError(error)) {
+        if (error.message && error.message.includes('会话不存在')) {
             console.log('会话不存在，创建新会话');
             const created = await this.createNewSession();
             if (!created) {
@@ -2310,7 +2180,7 @@ ChatManager.prototype.initializeChatFromCloud = async function() {
         this.messageHistory = [];
         
         // 添加欢迎消息
-        this.addMessage('assistant', '您好！我是AI网络工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？');
+        this.addMessage('assistant', '您好！我是ANP智能化运维平台工程助手。我可以帮助您管理和配置网络设备。请选择模式并告诉我您需要什么帮助？');
         
         // 加载最近的消息（最多10条）
         const recentMessages = cloudData.messages.slice(-10);
@@ -2394,6 +2264,3 @@ window.addEventListener('beforeunload', function() {
         networkStatusManager.stopAutoUpdate();
     }
 });
-
-
-

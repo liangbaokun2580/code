@@ -1,0 +1,53 @@
+# trusted-repo-template.yaml
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: trustedimagerepository
+spec:
+  crd:
+    spec:
+      names:
+        kind: TrustedImageRepository
+      validation:
+        openAPIV3Schema:
+          properties:
+            trustedPrefix:
+              type: string
+              default: "harbor.company.com/"
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package trustedimagerepository
+
+        # 获取容器镜像名称
+        get_container_images(container) = image {
+          image = container.image
+        }
+
+        # 主检查规则：发现违规
+        violation[{"msg": msg, "details": {}}] {
+          # 获取输入对象中的所有容器
+          containers := input.review.object.spec.containers
+          container := containers[_]
+          image := get_container_images(container)
+          
+          # 检查镜像前缀是否匹配信任仓库
+          trusted_prefix := input.parameters.trustedPrefix
+          not startswith(image, trusted_prefix)
+          
+          msg := sprintf("容器 '%v' 使用了不受信任的镜像 '%v'，必须使用以 '%v' 开头的镜像",
+            [container.name, image, trusted_prefix])
+        }
+
+        # 同时检查 initContainers
+        violation[{"msg": msg, "details": {}}] {
+          init_containers := input.review.object.spec.initContainers
+          container := init_containers[_]
+          image := get_container_images(container)
+          
+          trusted_prefix := input.parameters.trustedPrefix
+          not startswith(image, trusted_prefix)
+          
+          msg := sprintf("InitContainer '%v' 使用了不受信任的镜像 '%v'，必须使用以 '%v' 开头的镜像",
+            [container.name, image, trusted_prefix])
+        }

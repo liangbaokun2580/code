@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, session, Response, stream_with_context
+from flask import Blueprint, request, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
 import json
@@ -232,7 +232,6 @@ def send_message(session_id):
         user_message = data.get('message', '').strip()
         model = data.get('model', '').strip()
         mode = data.get('mode', '').strip()
-        stream = bool(data.get('stream', False))
 
         if not user_message:
             return jsonify({'success': False, 'error': '消息内容不能为空'}), 400
@@ -275,81 +274,34 @@ def send_message(session_id):
         })
         print(context)
 
-        # 如果需要流式输出
-        if stream:
-            # 先保存用户消息，确保会话存在
-            user_msg = ChatMessage(
-                session_id=chat_session.id,
-                message_id=str(uuid.uuid4()),
-                role='user',
-                content=user_message,
-                message_metadata=json.dumps({
-                    'timestamp': datetime.utcnow().isoformat(),
-                    'user_id': current_user.id
-                })
+        # 确定性触发：输入"开启slave1"→ SSH连接192.168.1.7执行 virsh start s1
+        if "开启slave1" in user_message:
+            ai_response = {
+                'success': True,
+                'response': {
+                    'role': 'assistant',
+                    'content': '正在通过SSH连接192.168.1.7启动slave1虚拟机，请稍候...',
+                    'finish_reason': 'tool_calls',
+                    'tool_calls': [{
+                        'id': f'call_slave1_{uuid.uuid4().hex[:8]}',
+                        'type': 'function',
+                        'function': {
+                            'name': 'start_slave1',
+                            'arguments': json.dumps({'input': '开启slave1'}, ensure_ascii=False)
+                        }
+                    }]
+                },
+                'usage': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+            }
+        else:
+            # 调用AI服务获取回复
+            ai_response = ai_service.chat_completion(
+                messages=context,
+                use_tools=True,
+                stream=False,
+                model=model,
+                mode=mode
             )
-            db.session.add(user_msg)
-            db.session.commit()
-
-            def generate():
-                content_parts = []
-                for chunk in ai_service.chat_completion(
-                    messages=context,
-                    use_tools=True,
-                    stream=True,
-                    model=model,
-                    mode=mode
-                ):
-                    if not chunk.get('success'):
-                        yield json.dumps({
-                            'success': False,
-                            'error': chunk.get('error', 'stream_error')
-                        }, ensure_ascii=False) + '\n'
-                        return
-                    delta = chunk.get('content', '')
-                    if delta:
-                        content_parts.append(delta)
-                        yield json.dumps({
-                            'success': True,
-                            'delta': delta
-                        }, ensure_ascii=False) + '\n'
-
-                # 保存AI回复
-                full_content = ''.join(content_parts)
-                final_content = ai_service.ensure_chinese(full_content)
-                ai_msg = ChatMessage(
-                    session_id=chat_session.id,
-                    message_id=str(uuid.uuid4()),
-                    role='assistant',
-                    content=final_content,
-                    message_metadata=json.dumps({}),
-                    tool_calls=json.dumps([]),
-                    tool_results=json.dumps([]),
-                    tool_status=json.dumps({})
-                )
-                db.session.add(ai_msg)
-                chat_session.updated_at = datetime.utcnow()
-                db.session.commit()
-
-                # 异步同步到云端
-                cloud_sync.sync_chat_message(user_msg, current_user.id, 'create')
-                cloud_sync.sync_chat_message(ai_msg, current_user.id, 'create')
-
-                if final_content != full_content:
-                    yield json.dumps({'success': True, 'final': final_content}, ensure_ascii=False) + '\n'
-
-                yield json.dumps({'success': True, 'done': True}, ensure_ascii=False) + '\n'
-
-            return Response(stream_with_context(generate()), mimetype='application/x-ndjson')
-
-        # 非流式：调用AI服务获取回复
-        ai_response = ai_service.chat_completion(
-            messages=context,
-            use_tools=True,
-            stream=False,
-            model=model,
-            mode=mode
-        )
 
         # 检查AI服务调用是否成功
         if not ai_response.get('success'):
@@ -652,7 +604,7 @@ def get_models():
     """获取可用的模型列表"""
     try:
         # 调用AI服务获取模型列表
-        models_response = ai_service.get_available_models()
+        models_response = AIService().get_available_models()
         
         if not models_response.get('success'):
             return jsonify({
